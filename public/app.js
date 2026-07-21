@@ -553,7 +553,7 @@ function showLogin() {
                 <span class="promo-card-title">AI Insights</span>
                 <span class="promo-ai-pill">AI</span>
               </div>
-              <p class="promo-card-text">Employee engagement is trending up</p>
+              <p class="promo-card-text">Revenue is trending up</p>
               <div class="promo-metric">+18%</div>
               <svg class="promo-sparkline" viewBox="0 0 160 40" preserveAspectRatio="none">
                 <polyline points="0,32 20,30 40,26 60,28 80,18 100,20 120,10 140,6 160,4" fill="none" stroke="currentColor" stroke-width="2.5"/>
