@@ -1,0 +1,7 @@
+node_modules/
+data/
+storage/
+.env
+*.log
+server_backup.mjs
+.DS_Store
