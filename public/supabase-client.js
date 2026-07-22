@@ -19,7 +19,8 @@ async function notify(userId, title, message, type = 'info', linkId = null) {
 async function uploadFile(file) {
   if (!file) return null;
   const ext = file.name.split('.').pop();
-  const filename = `${crypto.randomUUID()}.${ext}`;
+  const uuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substring(2);
+  const filename = `${uuid}.${ext}`;
   const { data, error } = await supabase.storage.from('documents').upload(filename, file);
   if (error) throw error;
   const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(filename);
