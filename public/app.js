@@ -504,126 +504,208 @@ function logout() {
 function showLogin() {
   document.body.innerHTML = `
     <div id="tc" class="toast-container"></div>
-    <div class="login-strip login-strip-top">
-      <span>Zivio - The future workforce partner</span>
-      <span>Billing entity: Airconnect Infosystems Pvt. Ltd.</span>
-    </div>
-    <main class="login-layout">
-      <div class="login-left">
-        <div class="login-left-content">
-          <h1>AI-Powered CRM.<br><span>Revenue-First Future.</span></h1>
-          <p>Zivio CRM brings together automation, intelligence, and human connection to build high-performing teams.</p>
-
-          <div class="login-badges">
-            <div class="login-badge login-badge-active">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              AI Insights
-            </div>
-            <div class="login-badge">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              Smart Automation
-            </div>
-            <div class="login-badge">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-              People Analytics
-            </div>
+    <div class="si-wrapper">
+      <div class="si-topbar-thin">
+        <div class="si-topbar-inner si-flex-between">
+          <span>Zivio - The future workforce partner</span>
+          <span>Billing entity: Airconnect Infosystems Pvt. Ltd.</span>
+        </div>
+      </div>
+      <div class="si-topbar-broad">
+        <div class="si-topbar-inner si-flex-between">
+          <div class="si-brand-left">
+            <img src="/assets/Zivio.png" alt="Zivio Left" style="height: 80px; object-fit: contain;" />
           </div>
+          <div class="si-brand-right">
+            <img src="/assets/ziviol2.png" alt="Zivio Right" style="height: 80px; object-fit: contain;" />
+          </div>
+        </div>
+      </div>
+      <div class="si-main-area">
+        <div class="si-left-panel">
+          <div class="si-left-content-inner">
+            <div class="si-fade-block" id="heroTextBlock">
+            </div>
+            
+            <div class="si-pill-tags" id="heroPillTags">
+            </div>
 
-          <div class="login-promo-stack">
-            <div class="promo-card promo-card-back">
-              <div class="promo-row">
-                <span class="promo-row-title">Leave Requests</span>
-                <a href="#" class="promo-view-all">View all</a>
-              </div>
-              <div class="promo-row-sub">Pending Approvals</div>
-              <div class="promo-avatars">
-                <span class="promo-avatar">B</span>
-                <span class="promo-avatar">C</span>
-              </div>
-              <div class="promo-row promo-row-payroll">
-                <div>
-                  <div class="promo-row-title">Payroll Run</div>
-                  <div class="promo-row-sub">June 2026</div>
+            <div class="si-graphic-container">
+              <div class="si-float-card card-ai" id="card-ai">
+                <div class="fc-header">
+                  <span>AI Insights</span>
+                  <span class="fc-badge">AI</span>
                 </div>
-                <span class="promo-status-pill">Completed</span>
+                <div class="fc-body">Revenue is trending up</div>
+                <div class="fc-stat">+18%</div>
+                <svg class="fc-chart" viewBox="0 0 100 30" preserveAspectRatio="none">
+                  <path d="M0 30 Q 20 20, 40 25 T 80 10 T 100 5 L 100 30 Z" fill="rgba(86,81,246,0.1)"/>
+                  <path d="M0 30 Q 20 20, 40 25 T 80 10 T 100 5" fill="none" stroke="#5651f6" stroke-width="2"/>
+                </svg>
+              </div>
+              <div class="si-float-card card-leave" id="card-leave">
+                <div class="fc-header">Leave Requests</div>
+                <div class="fc-body-sm">12 Pending Approvals</div>
+                <div class="fc-avatars">
+                  <div class="fc-avatar" style="background: #f87171">A</div>
+                  <div class="fc-avatar" style="background: #60a5fa">B</div>
+                  <div class="fc-avatar" style="background: #34d399">C</div>
+                  <span class="fc-view-all">View all</span>
+                </div>
+              </div>
+              <div class="si-float-card card-payroll" id="card-payroll">
+                <div class="fc-icon-circle">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                </div>
+                <div>
+                  <div class="fc-title">Payroll Run</div>
+                  <div class="fc-subtitle">June 2026</div>
+                </div>
+                <div class="fc-badge-green">Completed</div>
               </div>
             </div>
-
-            <div class="promo-card promo-card-front">
-              <div class="promo-card-header">
-                <span class="promo-card-title">AI Insights</span>
-                <span class="promo-ai-pill">AI</span>
+            
+            <div class="si-trusted-footer">
+              <div class="si-trusted-item">
+                <span class="si-shield-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5651f6" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </span>
+                <div>
+                  <div class="si-trusted-title">Enterprise-grade security</div>
+                  <div class="si-trusted-sub">SOC 2 Type II • GDPR Compliant</div>
+                </div>
               </div>
-              <p class="promo-card-text">Revenue is trending up</p>
-              <div class="promo-metric">+18%</div>
-              <svg class="promo-sparkline" viewBox="0 0 160 40" preserveAspectRatio="none">
-                <polyline points="0,32 20,30 40,26 60,28 80,18 100,20 120,10 140,6 160,4" fill="none" stroke="currentColor" stroke-width="2.5"/>
-              </svg>
-            </div>
-          </div>
-
-          <div class="login-security">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <div>
-              <div class="login-security-title">Enterprise-grade security</div>
-              <div class="login-security-sub">SOC 2 Type II • GDPR Compliant</div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="login-right">
-        <div class="login-form-wrapper">
-          <div class="login-logo-wrap">
-            <img src="/assets/Zivio.png" alt="Zivio CRM" style="height: 200px; object-fit: contain;" />
-          </div>
-          <div class="login-header">
-            <h2>Welcome back</h2>
-            <p>Sign in to your Zivio workspace</p>
-          </div>
-          <form id="lf">
-            <div class="login-field">
-              <label>Work Email</label>
-              <div class="login-input-wrap">
-                <svg class="login-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                <input type="email" id="le" placeholder="you@company.com" autocomplete="email" required>
+
+        <div class="si-right-panel">
+          <div class="si-form-container">
+            <div class="si-card-header">
+              <h2>Welcome back</h2>
+              <p>Sign in to your Zivio workspace</p>
+            </div>
+            <form id="lf">
+              <div class="si-form-group">
+                <label>Work Email</label>
+                <div class="si-input-wrapper">
+                  <span class="si-input-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+                  </span>
+                  <input class="si-input" type="email" id="le" placeholder="you@company.com" autocomplete="email" required>
+                </div>
               </div>
-            </div>
-            <div class="login-field">
-              <label>Password</label>
-              <div class="login-input-wrap">
-                <svg class="login-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <input type="password" id="lp" placeholder="••••••••" autocomplete="current-password" required>
-                <button type="button" class="login-show-pwd" id="lshow">Show</button>
+              <div class="si-form-group">
+                <label>Password</label>
+                <div class="si-input-wrapper">
+                  <span class="si-input-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  </span>
+                  <input class="si-input" type="password" id="lp" placeholder="••••••••" autocomplete="current-password" required>
+                  <button type="button" class="si-pw-toggle" id="lshow">Show</button>
+                </div>
               </div>
-            </div>
-            <div id="lerr" style="display:none; color: var(--red); font-size: 13px; margin-bottom: 16px;"></div>
-            <div class="login-actions">
-              <label class="remember-me"><input type="checkbox"> Remember me</label>
-            </div>
-            <button class="btn-signin" type="submit" id="lbtn">Sign in &rarr;</button>
-          </form>
+              <div id="lerr" style="display:none; color: #ef4444; font-size: 13px; margin-bottom: 16px;"></div>
+              <div class="si-form-options">
+                <label class="si-checkbox-label">
+                  <input type="checkbox" id="lrem"> Remember me
+                </label>
+                <a href="#" class="si-forgot-link">Forgot password?</a>
+              </div>
+              <button class="si-btn-primary" type="submit" id="lbtn">Sign in &rarr;</button>
+              
+              <div class="si-ai-banner">
+                <span class="si-ai-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5651f6" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                </span>
+                <div id="aiTipBlock" style="flex: 1;">
+                </div>
+                <span class="si-ai-arrow">&rarr;</span>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
-    </main>
-    <div class="login-strip login-strip-bottom">
-      <span>Zivio - The future workforce partner</span>
-      <span>Billing entity: Airconnect Infosystems Pvt. Ltd.</span>
-    </div>`;
+      <div class="si-topbar-thin">
+        <div class="si-topbar-inner si-flex-between">
+          <span>Zivio - The future workforce partner</span>
+          <span>Billing entity: Airconnect Infosystems Pvt. Ltd.</span>
+        </div>
+      </div>
+    </div>
+  `;
 
-  $('lshow').onclick = () => {
-    const pw = $('lp');
+  const features = [
+    { id: "ai", tagTitle: "AI Insights", tagIcon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>', title1: "AI-Powered CRM.", title2: "Revenue-First Future.", desc: "Zivio CRM brings together automation, intelligence, and human connection to build high-performing teams." },
+    { id: "leave", tagTitle: "Smart Automation", tagIcon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>', title1: "Streamline Tasks.", title2: "Zero Friction.", desc: "Automate approvals, leave tracking, and daily HR routines to free up your team's valuable time." },
+    { id: "payroll", tagTitle: "People Analytics", tagIcon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>', title1: "Data Insights.", title2: "Clear Decisions.", desc: "Turn raw workforce data into actionable insights for engagement, retention, and strategic growth." }
+  ];
+  const aiTips = [
+    { title: "AI is working for you", desc: "Ziva helps you save time, reduce manual work, and make smarter people decisions." },
+    { title: "Automated Compliance", desc: "We stay on top of the latest regulations so your HR policies are always up to date." },
+    { title: "Smart Onboarding", desc: "Provide new hires with an AI-guided journey for a seamless and engaging first day." }
+  ];
+  let activeFeatIdx = 0;
+  let activeTipIdx = 0;
+
+  const heroText = document.getElementById('heroTextBlock');
+  const heroTags = document.getElementById('heroPillTags');
+  const tipBlock = document.getElementById('aiTipBlock');
+  const cards = [document.getElementById('card-ai'), document.getElementById('card-leave'), document.getElementById('card-payroll')];
+
+  function renderFeature() {
+    const f = features[activeFeatIdx];
+    heroText.innerHTML = `<h1 class="si-hero-title">${f.title1}<br><span class="si-text-primary">${f.title2}</span></h1><p class="si-hero-desc">${f.desc}</p>`;
+    heroText.style.animation = 'none';
+    void heroText.offsetWidth;
+    heroText.style.animation = 'fade-in 0.5s ease-out forwards';
+
+    heroTags.innerHTML = features.map((feat, i) => `<span class="si-tag ${i === activeFeatIdx ? 'si-tag-active' : ''}">${feat.tagIcon}${feat.tagTitle}</span>`).join('');
+    
+    cards.forEach((c, i) => {
+      if (i === activeFeatIdx) {
+        c.classList.remove('card-inactive'); c.classList.add('card-active');
+      } else {
+        c.classList.remove('card-active'); c.classList.add('card-inactive');
+      }
+    });
+  }
+
+  function renderTip() {
+    const t = aiTips[activeTipIdx];
+    tipBlock.innerHTML = `<strong>${t.title}</strong><p>${t.desc}</p>`;
+    tipBlock.style.animation = 'none';
+    void tipBlock.offsetWidth;
+    tipBlock.style.animation = 'fade-in 0.5s ease-out forwards';
+  }
+
+  renderFeature();
+  renderTip();
+
+  if (window.featTimer) clearInterval(window.featTimer);
+  if (window.tipTimer) clearInterval(window.tipTimer);
+  
+  window.featTimer = setInterval(() => { activeFeatIdx = (activeFeatIdx + 1) % features.length; renderFeature(); }, 4500);
+  window.tipTimer = setInterval(() => { activeTipIdx = (activeTipIdx + 1) % aiTips.length; renderTip(); }, 5500);
+
+  document.getElementById('lshow').onclick = () => {
+    const pw = document.getElementById('lp');
     const isPwd = pw.type === 'password';
     pw.type = isPwd ? 'text' : 'password';
-    $('lshow').textContent = isPwd ? 'Hide' : 'Show';
+    document.getElementById('lshow').textContent = isPwd ? 'Hide' : 'Show';
   };
 
-  $('lf').onsubmit = async e => {
+  document.getElementById('lf').onsubmit = async e => {
     e.preventDefault();
-    const btn = $('lbtn'); btn.disabled=true; btn.textContent='Signing in...';
-    const err = $('lerr'); err.style.display='none';
-    try { await doLogin($('le').value, $('lp').value); }
-    catch(ex) { err.textContent = ex.message; err.style.display='flex'; }
-    finally { btn.disabled=false; btn.textContent='Sign In →'; }
+    const btn = document.getElementById('lbtn'); btn.disabled=true; btn.innerHTML='<span class="si-spinner"></span>';
+    const err = document.getElementById('lerr'); err.style.display='none';
+    try { 
+      await doLogin(document.getElementById('le').value, document.getElementById('lp').value); 
+      clearInterval(window.featTimer);
+      clearInterval(window.tipTimer);
+    }
+    catch(ex) { err.textContent = ex.message; err.style.display='block'; }
+    finally { btn.disabled=false; btn.innerHTML='Sign in &rarr;'; }
   };
 }
 
@@ -653,7 +735,7 @@ function Sidebar() {
   return `
     <aside class="sidebar">
       <div class="sidebar-brand" style="gap: 8px;">
-        <img src="/assets/ziviol2.png" alt="ZivioCRM" style="width: 32px; height: 32px; object-fit: contain; border-radius: 6px;" />
+        <img src="/assets/Zivio.png" alt="ZivioCRM" style="width: 32px; height: 32px; object-fit: contain; border-radius: 6px;" />
         <div><div class="brand-name">ZivioCRM</div><div class="brand-tag">ISP Tender Management</div></div>
       </div>
       <nav class="sidebar-nav">
