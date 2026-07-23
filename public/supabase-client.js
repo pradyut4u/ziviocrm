@@ -248,3 +248,17 @@ async function up(path, fd) {
 
 window.api = api;
 window.up = up;
+
+function subscribeToTable(tableName, callback) {
+  const channel = supabase.channel(`public:${tableName}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: tableName },
+      (payload) => {
+        callback(payload);
+      }
+    )
+    .subscribe();
+  return channel;
+}
+window.subscribeToTable = subscribeToTable;

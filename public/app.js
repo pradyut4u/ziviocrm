@@ -1,5 +1,5 @@
 // ============================================================
-// TENDEROPS — ISP Tender Management System (Vanilla JS SPA)
+// TENDEROPS â€” ISP Tender Management System (Vanilla JS SPA)
 // ============================================================
 
 // ---- State ----
@@ -79,7 +79,7 @@ function toast(msg, type = 'info') {
 function fmt(val, type) {
   if (val === null || val === undefined || val === '') return '<span style="color:var(--text3)">-</span>';
   if (type === 'date') { try { return new Date(val).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); } catch { return val; } }
-  if (type === 'currency') return '₹' + parseFloat(val).toLocaleString('en-IN');
+  if (type === 'currency') return 'â‚¹' + parseFloat(val).toLocaleString('en-IN');
   if (type === 'size') { const s=parseInt(val)||0; return s>1048576?(s/1048576).toFixed(1)+' MB':(s/1024).toFixed(0)+' KB'; }
   return esc(val);
 }
@@ -91,20 +91,20 @@ function timeAgo(d) {
 }
 
 function fileIcon(mime) {
-  if (!mime) return '📎'; mime = String(mime).toLowerCase();
-  if (mime.includes('pdf')) return '📄';
-  if (mime.includes('word')||mime.includes('doc')) return '📝';
-  if (mime.includes('excel')||mime.includes('sheet')||mime.includes('xls')) return '📊';
-  if (mime.includes('image')) return '🖼️'; return '📎';
+  if (!mime) return 'ðŸ“Ž'; mime = String(mime).toLowerCase();
+  if (mime.includes('pdf')) return 'ðŸ“„';
+  if (mime.includes('word')||mime.includes('doc')) return 'ðŸ“';
+  if (mime.includes('excel')||mime.includes('sheet')||mime.includes('xls')) return 'ðŸ“Š';
+  if (mime.includes('image')) return 'ðŸ–¼ï¸'; return 'ðŸ“Ž';
 }
 
 function stageBadge(stage) {
   const m = {
-    ph1_draft:['b-gray','○ Ph1 Draft'], ph1_complete:['b-blue','● Ph1 Complete'],
-    ph2_active:['b-purple','⚙ Ph2 Active'], ph2_complete:['b-cyan','✓ Ph2 Complete'],
-    ph3_active:['b-amber','⚖ Ph3 Awarding'], ph3_awarded:['b-green','✓ Ph3 Awarded'], ph3_disqualified:['b-red','⨯ Ph3 Disqualified'],
-    ph4_active:['b-blue','🚚 Ph4 Delivery'], ph4_complete:['b-cyan','✓ Ph4 Complete'],
-    ph5_active:['b-amber','₹ Ph5 Billing'], closed:['b-green','● Closed']
+    ph1_draft:['b-gray','â—‹ Ph1 Draft'], ph1_complete:['b-blue','â— Ph1 Complete'],
+    ph2_active:['b-purple','âš™ Ph2 Active'], ph2_complete:['b-cyan','âœ“ Ph2 Complete'],
+    ph3_active:['b-amber','âš– Ph3 Awarding'], ph3_awarded:['b-green','âœ“ Ph3 Awarded'], ph3_disqualified:['b-red','â¨¯ Ph3 Disqualified'],
+    ph4_active:['b-blue','ðŸšš Ph4 Delivery'], ph4_complete:['b-cyan','âœ“ Ph4 Complete'],
+    ph5_active:['b-amber','â‚¹ Ph5 Billing'], closed:['b-green','â— Closed']
   }[stage] || ['b-gray', stage];
   return `<span class="badge ${m[0]}">${m[1]}</span>`;
 }
@@ -468,9 +468,41 @@ async function init() {
     S.user = await api('GET', '/auth/me');
     if (!S.user) return showLogin();
     await loadAll();
+    setupRealtime();
     setInterval(loadNotifs, 30000);
     render();
   } catch { localStorage.removeItem('_tok'); showLogin(); }
+}
+
+function setupRealtime() {
+  if (!window.subscribeToTable) return;
+  
+  window.subscribeToTable('leads', async () => {
+    await loadLeads();
+    render();
+  });
+  
+  window.subscribeToTable('tenders', async () => {
+    await loadTenders();
+    if (S.tenderId) await loadTender(S.tenderId);
+    render();
+  });
+  
+  window.subscribeToTable('notifications', async () => {
+    if (typeof loadNotifs === 'function') await loadNotifs();
+    render();
+  });
+  
+  if (['admin', 'mgmt'].includes(S.user?.role)) {
+    window.subscribeToTable('audit_logs', async () => {
+      if (typeof loadAudit === 'function') await loadAudit();
+      render();
+    });
+    window.subscribeToTable('users', async () => {
+      if (typeof loadUsers === 'function') await loadUsers();
+      render();
+    });
+  }
 }
 
 async function loadAll() {
@@ -611,7 +643,7 @@ function showLogin() {
                 </span>
                 <div>
                   <div class="si-trusted-title">Enterprise-grade security</div>
-                  <div class="si-trusted-sub">SOC 2 Type II • GDPR Compliant</div>
+                  <div class="si-trusted-sub">SOC 2 Type II â€¢ GDPR Compliant</div>
                 </div>
               </div>
             </div>
@@ -640,7 +672,7 @@ function showLogin() {
                   <span class="si-input-icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                   </span>
-                  <input class="si-input" type="password" id="lp" placeholder="••••••••" autocomplete="current-password" required>
+                  <input class="si-input" type="password" id="lp" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" autocomplete="current-password" required>
                   <button type="button" class="si-pw-toggle" id="lshow">Show</button>
                 </div>
               </div>
@@ -764,8 +796,8 @@ function render() {
 function Sidebar() {
   const role = S.user?.role;
   const items = [
-    {p:'dashboard',l:'Dashboard',i:'⊞',all:true},
-    {p:'admin',l:'Admin Panel',i:'◈',roles:['admin']},
+    {p:'dashboard',l:'Dashboard',i:'âŠž',all:true},
+    {p:'admin',l:'Admin Panel',i:'â—ˆ',roles:['admin']},
   ].filter(x => x.all || x.roles?.includes(role));
   return `
     <aside class="sidebar">
@@ -783,7 +815,7 @@ function Sidebar() {
       <div class="sidebar-footer">
         <div class="avatar">${(S.user?.name||'U')[0].toUpperCase()}</div>
         <div style="flex:1;min-width:0"><div class="user-name">${esc(S.user?.name||'')}</div><div class="user-role">${roleLabel(role)}</div></div>
-        <button class="logout-btn" id="logoutBtn" title="Logout">⏻</button>
+        <button class="logout-btn" id="logoutBtn" title="Logout">â»</button>
       </div>
     </aside>`;
 }
@@ -792,10 +824,10 @@ function Header() {
   const t = {dashboard:'Dashboard',tenders:'Phase 1 & 3: Tenders',leads:'Phase 1 & 3: Leads',technical:'Phase 2 & 4: Technical',billing:'Phase 5: Billing & Accounts',admin:'Administration'}[S.page]||'ZivioCRM';
   return `
     <header class="topbar">
-      <button class="icon-btn mobile-only" id="menuBtn" title="Menu" style="margin-right: 12px; font-size: 18px;">☰</button>
+      <button class="icon-btn mobile-only" id="menuBtn" title="Menu" style="margin-right: 12px; font-size: 18px;">â˜°</button>
       <div class="topbar-title">${t}</div>
       <div class="page-actions">
-        <button class="icon-btn" id="nb-btn" title="Notifications">🔔
+        <button class="icon-btn" id="nb-btn" title="Notifications">ðŸ””
           <span class="notif-badge" id="nb" style="display:${S.unread?'flex':'none'}">${S.unread}</span>
         </button>
       </div>
@@ -820,7 +852,7 @@ function Pipeline(stage) {
     const cls = active ? (stage === 'ph3_disqualified' ? 'active-error' : 'active') : done ? 'done' : '';
     const label = (stage === 'ph3_disqualified' && si === 2) ? 'Disqualified' : step.l;
     html += `<div class="pip-step"><div class="pip-node">
-      <div class="pip-dot ${cls}">${done?'✓':(stage==='ph3_disqualified'&&si===2)?'⨯':si+1}</div>
+      <div class="pip-dot ${cls}">${done?'âœ“':(stage==='ph3_disqualified'&&si===2)?'â¨¯':si+1}</div>
       <div class="pip-lbl ${cls}">${label}</div>
     </div></div>`;
     if (si < STEPS.length-1) html += `<div class="pip-line ${done?'done':''}"></div>`;
@@ -919,13 +951,13 @@ function PageDashboard() {
                     <td>${esc(acc.contract_period || '-')}</td>
                     <td>${acc.bandwidth_mbps ? acc.bandwidth_mbps + ' Mbps' : '-'}</td>
                     ${showCircuit ? `<td>${(acc.circuits||[]).map(c=>`<span class="badge" style="background:var(--blue);color:#fff;margin-right:4px">${esc(c.circuit_id)}</span>`).join('') || '-'}</td>` : ''}
-                    <td>${stageBadge(acc.stage)} ${alert ? `<button class="alert-silence-btn" data-silence="${acc.id}" title="Silence Alert">🔕</button>` : ''}</td>
+                    <td>${stageBadge(acc.stage)} ${alert ? `<button class="alert-silence-btn" data-silence="${acc.id}" title="Silence Alert">ðŸ”•</button>` : ''}</td>
                   </tr>
                 `}).join('')}
               </tbody>
             </table>
           </div>` : 
-          `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No leads yet</div>
+          `<div class="empty"><div class="empty-icon">ðŸ“‹</div><div class="empty-title">No leads yet</div>
            <div class="empty-sub">Create your first lead to get started</div></div>`}
       </div>`;
   };
@@ -972,13 +1004,13 @@ function PageDashboard() {
                     <td>${esc(acc.contract_period || '-')}</td>
                     <td>${acc.bandwidth_mbps ? acc.bandwidth_mbps + ' Mbps' : '-'}</td>
                     ${showCircuit ? `<td>${(acc.circuits||[]).map(c=>`<span class="badge" style="background:var(--blue);color:#fff;margin-right:4px">${esc(c.circuit_id)}</span>`).join('') || '-'}</td>` : ''}
-                    <td>${stageBadge(acc.stage)} ${alert ? `<button class="alert-silence-btn" data-silence="${acc.id}" title="Silence Alert">🔕</button>` : ''}</td>
+                    <td>${stageBadge(acc.stage)} ${alert ? `<button class="alert-silence-btn" data-silence="${acc.id}" title="Silence Alert">ðŸ”•</button>` : ''}</td>
                   </tr>
                 `}).join('')}
               </tbody>
             </table>
           </div>` : 
-          `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No tenders yet</div>
+          `<div class="empty"><div class="empty-icon">ðŸ“‹</div><div class="empty-title">No tenders yet</div>
            <div class="empty-sub">Create your first tender to get started</div></div>`}
       </div>`;
   };
@@ -1059,9 +1091,9 @@ function renderAnalytics() {
   });
 
   const formatRev = (v) => {
-    if (v >= 10000000) return '₹' + (v / 10000000).toFixed(2) + ' Cr';
-    if (v >= 100000) return '₹' + (v / 100000).toFixed(2) + ' L';
-    return '₹' + v.toLocaleString('en-IN');
+    if (v >= 10000000) return 'â‚¹' + (v / 10000000).toFixed(2) + ' Cr';
+    if (v >= 100000) return 'â‚¹' + (v / 100000).toFixed(2) + ' L';
+    return 'â‚¹' + v.toLocaleString('en-IN');
   };
 
   // Pipeline Data
@@ -1208,13 +1240,13 @@ function PageTenders() {
             <td style="font-size:11px;color:var(--text2);font-weight:600">${esc(t.bid_number||'-')}</td>
             <td>${esc(t.requirements?.order_number || '-')}</td>
             <td><div class="tbl-link">${esc(t.title)}</div></td>
-            <td>${esc(t.org_name||'—')}</td><td>${stageBadge(t.stage)}</td>
+            <td>${esc(t.org_name||'â€”')}</td><td>${stageBadge(t.stage)}</td>
             <td style="font-weight:700">${fmt(t.quoted_bid_value,'currency')}</td>
             <td>${fmt(t.bid_end_datetime,'date')}</td>
           </tr>`).join('')}
         </tbody>
       </table></div>`:
-      `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No tenders</div></div>`}`;
+      `<div class="empty"><div class="empty-icon">ðŸ”</div><div class="empty-title">No tenders</div></div>`}`;
 }
 
 // ---- Technical Page ----
@@ -1259,7 +1291,7 @@ function PageTechnical() {
           </tr>`).join('')}
         </tbody>
       </table></div>`:
-      `<div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">No technical tasks for tenders</div></div>`}
+      `<div class="empty"><div class="empty-icon">âš™</div><div class="empty-title">No technical tasks for tenders</div></div>`}
       
     <div class="sec-title" style="margin-top:32px;">Leads</div>
     ${lList.length?`
@@ -1291,7 +1323,7 @@ function PageTechnical() {
           </tr>`).join('')}
         </tbody>
       </table></div>`:
-      `<div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">No technical tasks for leads</div></div>`}
+      `<div class="empty"><div class="empty-icon">âš™</div><div class="empty-title">No technical tasks for leads</div></div>`}
   `;
 }
 
@@ -1317,7 +1349,7 @@ function PageBilling() {
           </tr>`).join('')}
         </tbody>
       </table></div>`:
-      `<div class="empty"><div class="empty-icon">💰</div><div class="empty-title">No tender billing items yet</div></div>`}
+      `<div class="empty"><div class="empty-icon">ðŸ’°</div><div class="empty-title">No tender billing items yet</div></div>`}
       
     <div class="sec-title" style="margin-top:32px;">Leads</div>
     ${lList.length?`
@@ -1331,7 +1363,7 @@ function PageBilling() {
           </tr>`).join('')}
         </tbody>
       </table></div>`:
-      `<div class="empty"><div class="empty-icon">💰</div><div class="empty-title">No lead billing items yet</div></div>`}
+      `<div class="empty"><div class="empty-icon">ðŸ’°</div><div class="empty-title">No lead billing items yet</div></div>`}
   `;
 }
 
@@ -1373,7 +1405,7 @@ function renderAdminTab() {
         <td style="font-size:12px;color:var(--text2)">${esc(l.entity_type)}</td>
         <td style="font-size:11px;color:var(--text3)">${(l.user_id||'').slice(0,8)}</td></tr>`;
       }).join('')}
-      ${!S.audit.length?`<tr><td colspan="4"><div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No logs yet</div></div></td></tr>`:''}
+      ${!S.audit.length?`<tr><td colspan="4"><div class="empty"><div class="empty-icon">ðŸ“‹</div><div class="empty-title">No logs yet</div></div></td></tr>`:''}
       </tbody>
     </table></div>`;
 
@@ -1424,7 +1456,7 @@ function PageDetail() {
   if (tabs.length > 0 && !tabs.find(tb=>tb.k===S.tab)) S.tab = tabs[0].k;
 
   return `
-    <button class="back-btn" id="backTenderBtn">← Back</button>
+    <button class="back-btn" id="backTenderBtn">â† Back</button>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px;flex-wrap:wrap">
       <div>
         <h1 style="font-size:19px;font-weight:800;margin-bottom:6px">${esc(t.title)}</h1>
@@ -1509,7 +1541,7 @@ function TabTenderInfo(t, role) {
           ${inputGroup('pre_bid_datetime','Pre-Bid Date & Time',t.pre_bid_datetime,'datetime-local',edit)}
           <div class="sec-title" style="grid-column:1/-1;margin-top:12px;margin-bottom:8px">Tender Requirements</div>
           ${inputGroup('contract_period','Contract Period',t.contract_period,'text',edit)}
-          ${inputGroup('est_bid_value','Estimated Bid Value (₹)',t.est_bid_value,'number',edit)}
+          ${inputGroup('est_bid_value','Estimated Bid Value (â‚¹)',t.est_bid_value,'number',edit)}
           ${inputGroup('payment_terms','Payment Terms',t.payment_terms,'text',edit)}
           ${inputGroup('service_type','Type of Service',t.service_type,'select',edit,['','ILL','MPLS','BroadBand','P2P','NLD'])}
           ${inputGroup('bandwidth_mbps','Bandwidth (Mbps)',t.bandwidth_mbps,'number',edit)}
@@ -1535,7 +1567,7 @@ function TabTenderInfo(t, role) {
         </form>
         
         <div class="sec-title" style="margin-top:24px">Tender Documents</div>
-        ${edit ? `<label class="upload-zone" id="docTenderDrop" style="margin-bottom:18px"><div class="uz-icon">☁</div><div class="uz-title">Upload Documents</div><input type="file" id="docTenderFile" style="display:none"></label>` : ''}
+        ${edit ? `<label class="upload-zone" id="docTenderDrop" style="margin-bottom:18px"><div class="uz-icon">â˜</div><div class="uz-title">Upload Documents</div><input type="file" id="docTenderFile" style="display:none"></label>` : ''}
         <div class="file-list">${(t.documents||[]).map(d=>`
           <div class="file-item"><div class="file-icon">${fileIcon(d.mime)}</div><div style="flex:1">${esc(d.name)}</div>
           <a href="${d.url}" target="_blank" class="btn btn-ghost btn-sm">View</a></div>`).join('')}
@@ -1577,7 +1609,7 @@ function TabTechnical(t, role) {
 
       <div class="card">
         <div class="sec-title">Phase 2: Technical Review</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">Pending Technical Report</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">âš™</div><div class="empty-title">Pending Technical Report</div></div>` : `
         <div class="grid g2">
             ${inputGroup('r_sp','Service Provider',r.service_provider)}
             ${inputGroup('r_sdate','Survey Date',r.survey_date)}
@@ -1595,8 +1627,8 @@ function TabTechnical(t, role) {
         </div>
         <div style="margin-top:16px">
             <div style="font-weight:600;margin-bottom:8px">Uploaded Reports:</div>
-            ${r.feasibility_doc_url ? `<a href="${r.feasibility_doc_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Feasibility Doc</a>` : ''}
-            ${r.site_survey_doc_url ? `<a href="${r.site_survey_doc_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Site Survey Doc</a>` : ''}
+            ${r.feasibility_doc_url ? `<a href="${r.feasibility_doc_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Feasibility Doc</a>` : ''}
+            ${r.site_survey_doc_url ? `<a href="${r.site_survey_doc_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Site Survey Doc</a>` : ''}
         </div>
         `}
       </div>
@@ -1610,7 +1642,7 @@ function TabAward(t, role) {
     return `
       <div class="card">
         <div class="sec-title">Phase 3: Award / Qualification</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">⚖</div><div class="empty-title">Pending Award Decision</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">âš–</div><div class="empty-title">Pending Award Decision</div></div>` : `
         <div class="grid g2">
             ${inputGroup('p3_res','Qualification Result',r.qualification_result)}
             ${inputGroup('p3_qval','Quoted Bid Value',r.quoted_bid_value)}
@@ -1633,7 +1665,7 @@ function TabDelivery(t, role) {
     return `
       <div class="card">
         <div class="sec-title">Phase 4: Technical Delivery</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">🚚</div><div class="empty-title">Pending Delivery</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">ðŸšš</div><div class="empty-title">Pending Delivery</div></div>` : `
         <div class="grid g2">
             ${inputGroup('p4_ad','Actual Delivery Date',r.delivery_date)}
             ${inputGroup('p4_rem','Delivery Notes',r.delivery_notes,'textarea')}
@@ -1672,8 +1704,8 @@ function TabDelivery(t, role) {
         ` : ''}
         <div style="margin-top:16px">
             <div style="font-weight:600;margin-bottom:8px">Documents:</div>
-            ${r.acceptance_form_url ? `<a href="${r.acceptance_form_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Acceptance Form</a>` : ''}
-            ${r.completion_cert_url ? `<a href="${r.completion_cert_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Completion Certificate</a>` : ''}
+            ${r.acceptance_form_url ? `<a href="${r.acceptance_form_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Acceptance Form</a>` : ''}
+            ${r.completion_cert_url ? `<a href="${r.completion_cert_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Completion Certificate</a>` : ''}
         </div>
         `}
       </div>
@@ -1688,7 +1720,7 @@ function TabBilling(t, role) {
     const cycs = t.payment_cycles||[];
     
     const headHtml = !inv.id ? 
-      (edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary" data-modal="ph5-invoice">Create Invoice Header</button>` : `<div class="empty"><div class="empty-icon">₹</div><div class="empty-title">Pending Invoice Creation</div></div>`) :
+      (edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary" data-modal="ph5-invoice">Create Invoice Header</button>` : `<div class="empty"><div class="empty-icon">â‚¹</div><div class="empty-title">Pending Invoice Creation</div></div>`) :
       `<div class="grid g3">
           ${inputGroup('i_no','Invoice Number',inv.invoice_number)}
           ${inputGroup('i_nt','Notif to Tender Date',inv.notif_to_tender_date)}
@@ -1702,7 +1734,7 @@ function TabBilling(t, role) {
           ${inputGroup('i_dt','Duration To',inv.duration_to)}
           ${inputGroup('i_pc','Payment Cycle',inv.payment_cycle)}
       </div>
-      ${inv.invoice_upload_url ? `<div style="margin-top:12px"><a href="${inv.invoice_upload_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Invoice Document</a></div>` : ''}
+      ${inv.invoice_upload_url ? `<div style="margin-top:12px"><a href="${inv.invoice_upload_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Invoice Document</a></div>` : ''}
       `;
       
     let totalDue = cycs.reduce((a,c)=>a+parseFloat(c.amount_due||0),0);
@@ -1715,9 +1747,9 @@ function TabBilling(t, role) {
          ${edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary btn-sm" data-modal="ph5-cycle">+ Add Cycle</button>` : ''}
       </div>
       <div style="background:var(--bg2);padding:12px;border-radius:6px;display:flex;gap:24px;margin-bottom:16px;font-weight:600">
-         <div>Total Due: <span style="color:var(--text1)">₹${totalDue.toLocaleString('en-IN')}</span></div>
-         <div>Total Received: <span style="color:var(--green)">₹${totalRec.toLocaleString('en-IN')}</span></div>
-         <div>Balance: <span style="color:var(--red)">₹${bal.toLocaleString('en-IN')}</span></div>
+         <div>Total Due: <span style="color:var(--text1)">â‚¹${totalDue.toLocaleString('en-IN')}</span></div>
+         <div>Total Received: <span style="color:var(--green)">â‚¹${totalRec.toLocaleString('en-IN')}</span></div>
+         <div>Balance: <span style="color:var(--red)">â‚¹${bal.toLocaleString('en-IN')}</span></div>
       </div>
       <div class="table-wrap"><table>
          <thead><tr><th>Cycle</th><th>Period</th><th>Due</th><th>Status</th><th>Received</th><th>Pay Date</th>${edit?'<th>Act</th>':''}</tr></thead>
@@ -1760,13 +1792,13 @@ function PageLeads() {
           <tr class="tr-link" data-lnav="${t.id}">
             <td>${esc(t.requirements?.order_number || '-')}</td>
             <td><div class="tbl-link">${esc(t.title)}</div></td>
-            <td>${esc(t.org_name||'—')}</td><td>${stageBadge(t.stage)}</td>
+            <td>${esc(t.org_name||'â€”')}</td><td>${stageBadge(t.stage)}</td>
             <td style="font-weight:700">${fmt(t.quoted_bid_value,'currency')}</td>
             <td>${fmt(t.bid_end_datetime,'date')}</td>
           </tr>`).join('')}
         </tbody>
       </table></div>`:
-      `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No leads</div></div>`}`;
+      `<div class="empty"><div class="empty-icon">ðŸ”</div><div class="empty-title">No leads</div></div>`}`;
 }
 
 // ---- Technical Page ----
@@ -1780,7 +1812,7 @@ function LeadDetail() {
   if (tabs.length > 0 && !tabs.find(tb=>tb.k===S.tab)) S.tab = tabs[0].k;
 
   return `
-    <button class="back-btn" id="backLeadBtn">← Back</button>
+    <button class="back-btn" id="backLeadBtn">â† Back</button>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px;flex-wrap:wrap">
       <div>
         <h1 style="font-size:19px;font-weight:800;margin-bottom:6px">${esc(t.title)}</h1>
@@ -1874,7 +1906,7 @@ function TabLeadInfo(t, role) {
         </form>
         
         <div class="sec-title" style="margin-top:24px">Lead Documents</div>
-        ${edit ? `<label class="upload-zone" id="docLeadDrop" style="margin-bottom:18px"><div class="uz-icon">☁</div><div class="uz-title">Upload Documents</div><input type="file" id="docLeadFile" style="display:none"></label>` : ''}
+        ${edit ? `<label class="upload-zone" id="docLeadDrop" style="margin-bottom:18px"><div class="uz-icon">â˜</div><div class="uz-title">Upload Documents</div><input type="file" id="docLeadFile" style="display:none"></label>` : ''}
         <div class="file-list">${(t.documents||[]).map(d=>`
           <div class="file-item"><div class="file-icon">${fileIcon(d.mime)}</div><div style="flex:1">${esc(d.name)}</div>
           <a href="${d.url}" target="_blank" class="btn btn-ghost btn-sm">View</a></div>`).join('')}
@@ -1912,7 +1944,7 @@ function TabLeadTechnical(t, role) {
 
       <div class="card">
         <div class="sec-title">Phase 2: Technical Review</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">Pending Technical Report</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">âš™</div><div class="empty-title">Pending Technical Report</div></div>` : `
         <div class="grid g2">
             ${inputGroup('r_sp','Service Provider',r.service_provider)}
             ${inputGroup('r_sdate','Survey Date',r.survey_date)}
@@ -1930,8 +1962,8 @@ function TabLeadTechnical(t, role) {
         </div>
         <div style="margin-top:16px">
             <div style="font-weight:600;margin-bottom:8px">Uploaded Reports:</div>
-            ${r.feasibility_doc_url ? `<a href="${r.feasibility_doc_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Feasibility Doc</a>` : ''}
-            ${r.site_survey_doc_url ? `<a href="${r.site_survey_doc_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Site Survey Doc</a>` : ''}
+            ${r.feasibility_doc_url ? `<a href="${r.feasibility_doc_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Feasibility Doc</a>` : ''}
+            ${r.site_survey_doc_url ? `<a href="${r.site_survey_doc_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Site Survey Doc</a>` : ''}
         </div>
         `}
       </div>
@@ -1945,7 +1977,7 @@ function TabLeadAward(t, role) {
     return `
       <div class="card">
         <div class="sec-title">Phase 3: Award / Qualification</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">⚖</div><div class="empty-title">Pending Award Decision</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">âš–</div><div class="empty-title">Pending Award Decision</div></div>` : `
         <div class="grid g2">
             ${inputGroup('p3_res','Qualification Result',r.qualification_result)}
             ${inputGroup('p3_qval','Quoted Bid Value',r.quoted_bid_value)}
@@ -1968,7 +2000,7 @@ function TabLeadDelivery(t, role) {
     return `
       <div class="card">
         <div class="sec-title">Phase 4: Technical Delivery</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">🚚</div><div class="empty-title">Pending Delivery</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">ðŸšš</div><div class="empty-title">Pending Delivery</div></div>` : `
         <div class="grid g2">
             ${inputGroup('p4_ad','Actual Delivery Date',r.delivery_date)}
             ${inputGroup('p4_rem','Delivery Notes',r.delivery_notes,'textarea')}
@@ -2007,8 +2039,8 @@ function TabLeadDelivery(t, role) {
         ` : ''}
         <div style="margin-top:16px">
             <div style="font-weight:600;margin-bottom:8px">Documents:</div>
-            ${r.acceptance_form_url ? `<a href="${r.acceptance_form_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Acceptance Form</a>` : ''}
-            ${r.completion_cert_url ? `<a href="${r.completion_cert_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Completion Certificate</a>` : ''}
+            ${r.acceptance_form_url ? `<a href="${r.acceptance_form_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Acceptance Form</a>` : ''}
+            ${r.completion_cert_url ? `<a href="${r.completion_cert_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Completion Certificate</a>` : ''}
         </div>
         `}
       </div>
@@ -2023,7 +2055,7 @@ function TabLeadBilling(t, role) {
     const cycs = t.payment_cycles||[];
     
     const headHtml = !inv.id ? 
-      (edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary" data-modal="ph5-invoice">Create Invoice Header</button>` : `<div class="empty"><div class="empty-icon">₹</div><div class="empty-title">Pending Invoice Creation</div></div>`) :
+      (edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary" data-modal="ph5-invoice">Create Invoice Header</button>` : `<div class="empty"><div class="empty-icon">â‚¹</div><div class="empty-title">Pending Invoice Creation</div></div>`) :
       `<div class="grid g3">
           ${inputGroup('i_no','Invoice Number',inv.invoice_number)}
           ${inputGroup('i_nt','Notif to Lead Date',inv.notif_to_lead_date)}
@@ -2037,7 +2069,7 @@ function TabLeadBilling(t, role) {
           ${inputGroup('i_dt','Duration To',inv.duration_to)}
           ${inputGroup('i_pc','Payment Cycle',inv.payment_cycle)}
       </div>
-      ${inv.invoice_upload_url ? `<div style="margin-top:12px"><a href="${inv.invoice_upload_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Invoice Document</a></div>` : ''}
+      ${inv.invoice_upload_url ? `<div style="margin-top:12px"><a href="${inv.invoice_upload_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Invoice Document</a></div>` : ''}
       `;
       
     let totalDue = cycs.reduce((a,c)=>a+parseFloat(c.amount_due||0),0);
@@ -2050,9 +2082,9 @@ function TabLeadBilling(t, role) {
          ${edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary btn-sm" data-modal="ph5-cycle">+ Add Cycle</button>` : ''}
       </div>
       <div style="background:var(--bg2);padding:12px;border-radius:6px;display:flex;gap:24px;margin-bottom:16px;font-weight:600">
-         <div>Total Due: <span style="color:var(--text1)">₹${totalDue.toLocaleString('en-IN')}</span></div>
-         <div>Total Received: <span style="color:var(--green)">₹${totalRec.toLocaleString('en-IN')}</span></div>
-         <div>Balance: <span style="color:var(--red)">₹${bal.toLocaleString('en-IN')}</span></div>
+         <div>Total Due: <span style="color:var(--text1)">â‚¹${totalDue.toLocaleString('en-IN')}</span></div>
+         <div>Total Received: <span style="color:var(--green)">â‚¹${totalRec.toLocaleString('en-IN')}</span></div>
+         <div>Balance: <span style="color:var(--red)">â‚¹${bal.toLocaleString('en-IN')}</span></div>
       </div>
       <div class="table-wrap"><table>
          <thead><tr><th>Cycle</th><th>Period</th><th>Due</th><th>Status</th><th>Received</th><th>Pay Date</th>${edit?'<th>Act</th>':''}</tr></thead>
@@ -2088,7 +2120,7 @@ function removeModal() { $('mwrap')?.remove(); }
 function MW(title, body, footer, size='') {
   return `<div class="modal-overlay"><div class="modal ${size}">
     <div class="modal-header"><div class="modal-title">${title}</div>
-      <button class="modal-close" id="mclose">✕</button></div>
+      <button class="modal-close" id="mclose">âœ•</button></div>
     <div class="modal-body">${body}</div>
     <div class="modal-footer">${footer}</div>
   </div></div>`;
@@ -2119,7 +2151,7 @@ function attachModalHandlers() {
     } catch(e) { toast(e.message,'error'); }
   });
 
-  // Phase Transitions (modal buttons below — page-level ones are in attachAll)
+  // Phase Transitions (modal buttons below â€” page-level ones are in attachAll)
 
   $('ph2SubmitBtn')?.addEventListener('click', async()=>{
      const fd = new FormData();
@@ -2304,8 +2336,8 @@ function openModal(id) {
       <div class="grid g2">
          ${inputGroup('m3_res','Result',r.qualification_result || 'Awarded','select',true,['Awarded','Disqualified','Qualified'])}
          ${inputGroup('m3_ra','Reverse Auction',r.reverse_auction || 'No','select',true,['Yes','No'])}
-         ${inputGroup('m3_qval','Quoted Bid Value (₹)',r.quoted_bid_value || '','number',true)}
-         ${inputGroup('m3_rap','Final Price After RA (₹)',r.final_price_after_ra || '','number',true)}
+         ${inputGroup('m3_qval','Quoted Bid Value (â‚¹)',r.quoted_bid_value || '','number',true)}
+         ${inputGroup('m3_rap','Final Price After RA (â‚¹)',r.final_price_after_ra || '','number',true)}
       </div>
       <div id="m3_awarded_fields" style="margin-top:12px; display: ${(r.qualification_result || 'Awarded') === 'Awarded' ? 'block' : 'none'}" class="grid g2">
          ${inputGroup('m3_ad','Award Date',r.award_date || '','date',true)}
@@ -2745,7 +2777,7 @@ function attachAll() {
   // Phase 1: Submit to Technical button (lives on main page)
   $('btnSubmitPh1Tender')?.addEventListener('click', async () => {
     if (confirm('Submit tender to Technical team? This will lock Phase 1 for editing.')) {
-      try { await api('POST', `/tenders/${S.tenderId}/move`, { stage: 'ph2_active' }); await loadAll(); await loadTender(S.tenderId); render(); toast('Moved to Phase 2 — Technical', 'success'); } catch (e) { toast(e.message, 'error'); }
+      try { await api('POST', `/tenders/${S.tenderId}/move`, { stage: 'ph2_active' }); await loadAll(); await loadTender(S.tenderId); render(); toast('Moved to Phase 2 â€” Technical', 'success'); } catch (e) { toast(e.message, 'error'); }
     }
   });
 }
