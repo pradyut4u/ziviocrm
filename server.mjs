@@ -297,6 +297,32 @@ async function handle(req, res) {
     return jres(res, safe);
   }
 
+  // Admin Export Endpoint
+  if (p === '/api/export/data' && m === 'GET') {
+    if (user.role !== 'admin') return jerr(res, 'Forbidden', 403);
+    const fullTenders = tbl('tenders').map(t => ({
+      ...t,
+      documents: tbl('tender_documents').filter(d => d.tender_id === t.id),
+      technical_reports: tbl('technical_reports').filter(r => r.tender_id === t.id),
+      phase3_records: tbl('phase3_records').filter(b => b.tender_id === t.id),
+      phase4_records: tbl('phase4_records').filter(b => b.tender_id === t.id),
+      invoices: tbl('invoices').filter(i => i.tender_id === t.id),
+      payment_cycles: tbl('payment_cycles').filter(i => i.tender_id === t.id),
+      circuits: tbl('circuits').filter(c => c.parent_id === t.id && c.parent_type === 'tender')
+    }));
+    const fullLeads = tbl('leads').map(l => ({
+      ...l,
+      documents: tbl('tender_documents').filter(d => d.lead_id === l.id),
+      technical_reports: tbl('technical_reports').filter(r => r.lead_id === l.id),
+      phase3_records: tbl('phase3_records').filter(b => b.lead_id === l.id),
+      phase4_records: tbl('phase4_records').filter(b => b.lead_id === l.id),
+      invoices: tbl('invoices').filter(i => i.lead_id === l.id),
+      payment_cycles: tbl('payment_cycles').filter(i => i.lead_id === l.id),
+      circuits: tbl('circuits').filter(c => c.parent_id === l.id && c.parent_type === 'lead')
+    }));
+    return jres(res, { tenders: fullTenders, leads: fullLeads });
+  }
+
   // Tenders list
   if (p === '/api/tenders' && m === 'GET') {
     let list = tbl('tenders');

@@ -219,6 +219,40 @@ async function api(method, path, body) {
     return { success: true };
   }
   
+  if (path === '/export/data' && method === 'GET') {
+    const fetchFull = async (isLead) => {
+      const table = isLead ? 'leads' : 'tenders';
+      const prefix = isLead ? 'lead_' : '';
+      const pId = isLead ? 'lead_id' : 'tender_id';
+      
+      const { data: main } = await sbClient.from(table).select('*');
+      if (!main) return [];
+      
+      const [docs, tech, ph3, ph4, inv, cyc, cir] = await Promise.all([
+        sbClient.from(prefix + (isLead ? 'documents' : 'tender_documents')).select('*'),
+        sbClient.from(prefix + 'technical_reports').select('*'),
+        sbClient.from(prefix + 'phase3_records').select('*'),
+        sbClient.from(prefix + 'phase4_records').select('*'),
+        sbClient.from(prefix + 'invoices').select('*'),
+        sbClient.from(prefix + 'payment_cycles').select('*'),
+        sbClient.from('circuits').select('*').eq('parent_type', isLead ? 'lead' : 'tender')
+      ]);
+      
+      return main.map(item => ({
+        ...item,
+        documents: (docs.data || []).filter(d => d[pId] === item.id),
+        technical_reports: (tech.data || []).filter(d => d[pId] === item.id),
+        phase3_records: (ph3.data || []).filter(d => d[pId] === item.id),
+        phase4_records: (ph4.data || []).filter(d => d[pId] === item.id),
+        invoices: (inv.data || []).filter(d => d[pId] === item.id),
+        payment_cycles: (cyc.data || []).filter(d => d[pId] === item.id),
+        circuits: (cir.data || []).filter(d => d.parent_id === item.id)
+      }));
+    };
+    const [tenders, leads] = await Promise.all([fetchFull(false), fetchFull(true)]);
+    return { tenders, leads };
+  }
+  
   // Specific entity endpoints
   const match = path.match(/^\/(tenders|leads)\/([^\/]+)(?:\/(.*))?$/);
   if (match) {
@@ -1162,6 +1196,7 @@ function PageTenders() {
     <div class="page-header">
       <div><div class="page-title">Tenders</div><div class="page-sub">${list.length} tenders</div></div>
       <div class="page-actions">
+        ${role === 'admin' ? `<button class="btn btn-outline" id="btnExportTenders">Export CSV</button>` : ''}
         ${['tender','admin'].includes(role)?`<button class="btn btn-primary" id="btnNewTenderPage">+ New Tender</button>`:''}
       </div>
     </div>
@@ -1305,6 +1340,10 @@ function PageAdmin() {
   return `
     <div class="page-header">
       <div class="page-title">Administration</div>
+      <div class="page-actions">
+        <button class="btn btn-outline" id="btnExportTendersAdmin" onclick="openExportModal('tenders')">Export Tenders</button>
+        <button class="btn btn-outline" id="btnExportLeadsAdmin" onclick="openExportModal('leads')">Export Leads</button>
+      </div>
     </div>
     <div class="tabs">
       ${['users','audit'].map(t=>`<button class="tab-btn ${S.adminTab===t?'active':''}" data-atab="${t}">${{users:'Users',audit:'Audit Log'}[t]}</button>`).join('')}
@@ -1710,6 +1749,7 @@ function PageLeads() {
     <div class="page-header">
       <div><div class="page-title">Leads</div><div class="page-sub">${list.length} leads</div></div>
       <div class="page-actions">
+        ${role === 'admin' ? `<button class="btn btn-outline" id="btnExportLeads">Export CSV</button>` : ''}
         ${['lead','admin'].includes(role)?`<button class="btn btn-primary" id="btnNewLeadPage">+ New Lead</button>`:''}
       </div>
     </div>
@@ -2350,9 +2390,182 @@ function openModal(id) {
 }
 
 // ---- Event Listeners ----
+async function openExportModal(type) {
+  const isTender = type === 'tenders';
+  
+  const curBtn = isTender ? $('btnExportTendersAdmin') : $('btnExportLeadsAdmin');
+  if (curBtn) curBtn.textContent = 'Loading...';
+  
+  let res;
+  try {
+    res = await api('GET', '/export/data');
+  } catch (e) {
+    if (curBtn) curBtn.textContent = isTender ? 'Export Tenders' : 'Export Leads';
+    return toast('Failed to fetch data: ' + e.message, 'error');
+  }
+  
+  if (curBtn) curBtn.textContent = isTender ? 'Export Tenders' : 'Export Leads';
+  
+  const data = isTender ? res.tenders : res.leads;
+  if (!data || !data.length) return toast('No data to export', 'error');
+
+  const baseKeys = [
+    { id: 'bid_number', label: 'Bid/Ref Number' },
+    { id: 'title', label: 'Title' },
+    { id: 'org_name', label: 'Organisation Name' },
+    { id: 'stage', label: 'Current Stage' },
+    { id: 'service_type', label: 'Service Type' },
+    { id: 'bandwidth_mbps', label: 'Bandwidth (Mbps)' },
+    { id: 'contract_period', label: 'Contract Period' },
+    { id: 'link_delivery_address', label: 'Delivery Address' },
+    { id: 'created_at', label: 'Created At' },
+    { id: 'updated_at', label: 'Updated At' }
+  ];
+
+  const allKeys = new Set();
+  const groupMap = {};
+  const labelMap = {};
+
+  baseKeys.forEach(k => {
+    allKeys.add(k.id);
+    groupMap[k.id] = 'Basic Info';
+    labelMap[k.id] = k.label;
+  });
+
+  const prettyName = (k) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  data.forEach(item => {
+    ['technical_reports', 'phase3_records', 'phase4_records', 'invoices', 'payment_cycles', 'circuits'].forEach(rel => {
+        if (item[rel] && item[rel].length) {
+           item[rel].forEach(relItem => {
+              Object.keys(relItem).forEach(k => {
+                 if (['id', 'tender_id', 'lead_id', 'created_by', 'submitted_by', 'created_at', 'updated_at'].includes(k)) return;
+                 if (k.endsWith('_url')) return;
+                 
+                 if (k === 'survey_notes' && typeof relItem[k] === 'string') {
+                     try {
+                        const parsed = JSON.parse(relItem[k]);
+                        Object.keys(parsed).forEach(pk => {
+                           if (parsed[pk] !== null && parsed[pk] !== '') {
+                             const fK = `Ph2_Survey_${pk}`;
+                             allKeys.add(fK);
+                             groupMap[fK] = 'Phase 2: Survey Data';
+                             labelMap[fK] = prettyName(pk);
+                           }
+                        });
+                     } catch(e){}
+                 } else {
+                     const fK = `${rel}_${k}`;
+                     allKeys.add(fK);
+                     let gName = rel.replace('_records', '').replace('_', ' ').toUpperCase();
+                     if (gName === 'TECHNICAL REPORTS') gName = 'PHASE 2: REPORTS';
+                     groupMap[fK] = gName;
+                     labelMap[fK] = prettyName(k);
+                 }
+              });
+           });
+        }
+    });
+  });
+
+  let colHtml = '';
+  const groups = [...new Set(Array.from(allKeys).map(k => groupMap[k]))];
+  groups.forEach(g => {
+    colHtml += `<div style="margin-top:12px;font-weight:600;font-size:13px;color:var(--text1)">${g}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">`;
+    Array.from(allKeys).filter(k => groupMap[k] === g).forEach(k => {
+       const isBase = groupMap[k] === 'Basic Info';
+       colHtml += `<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2)">
+         <input type="checkbox" class="exp-col-chk" value="${k}" ${isBase ? 'checked' : ''}> ${labelMap[k]}
+       </label>`;
+    });
+    colHtml += `</div>`;
+  });
+
+  showModal(MW(`Export ${isTender ? 'Tenders' : 'Leads'}`, `
+    <div style="margin-bottom:12px;color:var(--text2);font-size:13px">Select specific fields. Nested records (like multiple invoices) will be comma-separated in their respective columns.</div>
+    <div class="form-group">
+       <label class="form-label">Export Format</label>
+       <select id="exportFormat" class="form-input">
+         <option value="csv">CSV (Selected Columns)</option>
+         <option value="json">JSON (Full Raw Data)</option>
+       </select>
+    </div>
+    <div id="colSelectWrap" style="max-height: 400px; overflow-y: auto; padding-right: 8px;">${colHtml}</div>
+  `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="btnConfirmExport">Download</button>`));
+  
+  $('exportFormat')?.addEventListener('change', (e) => {
+     $('colSelectWrap').style.display = e.target.value === 'csv' ? 'block' : 'none';
+  });
+
+  $('btnConfirmExport')?.addEventListener('click', async () => {
+     try {
+       const fmt = $('exportFormat').value;
+       if (fmt === 'json') {
+         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+         const url = URL.createObjectURL(blob);
+         const link = document.createElement('a'); link.href=url; link.download=`${type}_full_export_${new Date().toISOString().split('T')[0]}.json`; link.click();
+       } else {
+         const selectedCols = Array.from(document.querySelectorAll('.exp-col-chk:checked')).map(cb => cb.value);
+         if (!selectedCols.length) return toast('Select at least one column', 'error');
+         
+         const headers = selectedCols;
+         
+         const getVal = (item, key) => {
+             if (groupMap[key] === 'Basic Info') {
+                 let v = item[key];
+                 if (v === undefined && item.requirements && item.requirements[key] !== undefined) v = item.requirements[key];
+                 return v;
+             }
+             
+             if (key.startsWith('Ph2_Survey_')) {
+                 const pk = key.replace('Ph2_Survey_', '');
+                 return (item.technical_reports || []).map(r => {
+                     if (r.survey_notes) {
+                         try {
+                             const p = JSON.parse(r.survey_notes);
+                             if (p[pk] !== undefined && p[pk] !== null && p[pk] !== '') return p[pk];
+                         } catch(e){}
+                     }
+                     return null;
+                 }).filter(Boolean).join(' | ');
+             }
+             
+             for (const rel of ['technical_reports', 'phase3_records', 'phase4_records', 'invoices', 'payment_cycles', 'circuits']) {
+                 if (key.startsWith(rel + '_')) {
+                     const rK = key.replace(rel + '_', '');
+                     return (item[rel] || []).map(r => {
+                         let v = r[rK];
+                         if (Array.isArray(v)) v = v.join(', ');
+                         return v;
+                     }).filter(v => v !== null && v !== undefined && v !== '').join(' | ');
+                 }
+             }
+             return '';
+         };
+
+         const rows = data.map(item => headers.map(k => {
+           let val = getVal(item, k);
+           if (val === null || val === undefined) val = '';
+           return `"${String(val).replace(/"/g, '""')}"`;
+         }).join(','));
+         const csvContent = "\uFEFF" + [headers.map(k => labelMap[k]).join(','), ...rows].join('\n');
+         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+         const url = URL.createObjectURL(blob);
+         const link = document.createElement('a'); link.href=url; link.download=`${type}_custom_export_${new Date().toISOString().split('T')[0]}.csv`; link.click();
+       }
+       removeModal();
+       toast('Export completed successfully', 'success');
+     } catch (e) { toast('Export failed: ' + e.message, 'error'); }
+  });
+}
+
 function attachAll() {
   $('logoutBtn')?.addEventListener('click', logout);
   $('nb-btn')?.addEventListener('click', ()=>{S.notifOpen=!S.notifOpen; render();});
+  
+  $('btnExportTenders')?.addEventListener('click', () => openExportModal('tenders'));
+  $('btnExportLeads')?.addEventListener('click', () => openExportModal('leads'));
   $('rdAllBtn')?.addEventListener('click', async()=>{ await api('PATCH','/notifications/read-all'); await loadNotifs(); render(); });
   
   const toggleMenu = () => {
