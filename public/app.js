@@ -1419,6 +1419,10 @@ function PageAdmin() {
           <input type="email" id="nu-email" class="form-control" placeholder="user@company.com">
         </div>
         <div style="flex:1">
+          <label class="form-label">Password</label>
+          <input type="password" id="nu-pass" class="form-control" placeholder="Initial Password">
+        </div>
+        <div style="flex:1">
           <label class="form-label">Role</label>
           <select id="nu-role" class="form-control">
             <option value="lead_manager">Phase 1 & 3: Lead Manager</option>
@@ -2986,6 +2990,36 @@ window.calcTotal = function() {
   const g = parseFloat(document.getElementById('gst')?.value || 0);
   const t = document.getElementById('total_bid_value');
   if (t) t.value = (m + (m * g / 100)).toFixed(2);
+};
+
+window.createUser = async function() {
+  const body = {
+    name: $('nu-name')?.value,
+    email: $('nu-email')?.value,
+    password: $('nu-pass')?.value,
+    role: $('nu-role')?.value
+  };
+  if (!body.name || !body.email || !body.password) return toast('Name, email, and password are required', 'error');
+  try {
+    await api('POST', '/users', body);
+    await loadUsers();
+    render();
+    toast('User created!', 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+};
+
+window.toggleUserStatus = async function(userId, currentStatus) {
+  const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+  try {
+    await sbClient.from('users').update({ status: newStatus }).eq('id', userId);
+    await loadUsers();
+    render();
+    toast('User status updated', 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+  }
 };
 
 // ---- Run ----
