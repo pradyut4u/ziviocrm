@@ -1577,9 +1577,9 @@ async function toggleWorkspaceAccess(userId, hasAccess) {
       if (error) throw error;
       S.managingWorkspaceUsers = S.managingWorkspaceUsers.filter(id => id !== userId);
     } else {
-      const { error } = await sbClient.from('workspace_users').insert({ workspace_id: S.managingWorkspaceId, user_id: userId });
+      const { error } = await sbClient.from('workspace_users').upsert({ workspace_id: S.managingWorkspaceId, user_id: userId }, { onConflict: 'workspace_id,user_id', ignoreDuplicates: true });
       if (error) throw error;
-      S.managingWorkspaceUsers.push(userId);
+      if (!S.managingWorkspaceUsers.includes(userId)) S.managingWorkspaceUsers.push(userId);
     }
   } catch(e) {
     if (typeof toast !== 'undefined') toast('Failed to update access: ' + e.message, 'error');
