@@ -1510,7 +1510,7 @@ async function createWorkspace() {
     if (error) throw error;
     
     const newId = data[0].id;
-    await sbClient.from('workspace_users').insert({ workspace_id: newId, user_id: S.user.id });
+    await sbClient.from('workspace_users').upsert({ workspace_id: newId, user_id: S.user.id }, { onConflict: 'workspace_id,user_id', ignoreDuplicates: true });
     
     S.workspaces.push({ id: newId, name });
     render();
