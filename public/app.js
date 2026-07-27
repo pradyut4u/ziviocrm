@@ -471,8 +471,8 @@ async function init() {
     
     let ws = [];
     if (S.user.role === 'admin') {
-      const { data } = await sbClient.from('workspaces').select('*');
-      ws = data || [];
+      const { data, error } = await sbClient.from('workspaces').select('*');
+      ws = data || []; if(error) alert('WS Fetch Error: ' + error.message);
     } else {
       const { data } = await sbClient.from('workspace_users').select('workspaces(*)').eq('user_id', S.user.id);
       ws = data ? data.map(d => d.workspaces).filter(Boolean) : [];
@@ -1476,10 +1476,6 @@ function renderAdminWorkspaces() {
         <label class="form-label">Workspace Name</label>
         <input type="text" id="nw-name" class="form-control" placeholder="New Workspace Name">
       </div>
-      <div style="flex:1">
-        <label class="form-label">Workspace ID (Optional)</label>
-        <input type="text" id="nw-id" class="form-control" placeholder="e.g. NEW_WS">
-      </div>
       <button class="btn btn-primary" onclick="createWorkspace()">Add Workspace</button>
     </div>
     <div class="card p-24">
@@ -1503,17 +1499,16 @@ function renderAdminWorkspaces() {
 
 async function createWorkspace() {
   const name = document.getElementById('nw-name').value.trim();
-  let id = document.getElementById('nw-id').value.trim();
   if (!name) return typeof toast !== 'undefined' ? toast('Name is required', 'error') : alert('Name required');
-  if (!id) id = name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 10);
   
   try {
-    const { data, error } = await sbClient.from('workspaces').insert({ id, name }).select();
+    const { data, error } = await sbClient.from('workspaces').insert({ name }).select();
     if (error) throw error;
     
-    await sbClient.from('workspace_users').insert({ workspace_id: id, user_id: S.user.id });
+    const newId = data[0].id;
+    await sbClient.from('workspace_users').insert({ workspace_id: newId, user_id: S.user.id });
     
-    S.workspaces.push({ id, name });
+    S.workspaces.push({ id: newId, name });
     render();
     if (typeof toast !== 'undefined') toast('Workspace created', 'success');
   } catch(e) {
@@ -2995,4 +2990,4 @@ window.calcTotal = function() {
 
 // ---- Run ----
 init();
-
+
