@@ -186,7 +186,7 @@ async function api(method, path, body) {
     const table = path === '/tenders' ? 'tenders' : 'leads';
     const p3Table = path === '/tenders' ? 'phase3_records' : 'lead_phase3_records';
     if (method === 'GET') {
-      const { data } = await sbClient.from(table).select(`*, ${p3Table}(quoted_bid_value)`).eq('workspace_id', S.workspaceId);
+      const { data } = await sbClient.from(table).select(`*, ${p3Table}(quoted_bid_value)`)[S.workspaceId ? 'eq' : 'is']('workspace_id', S.workspaceId || null);
       const eType = path === '/tenders' ? 'tender' : 'lead';
       const { data: cir } = await sbClient.from('circuits').select('*').eq('parent_type', eType);
       if (data) {
@@ -206,12 +206,12 @@ async function api(method, path, body) {
   }
   
   if (path === '/audit' && method === 'GET') {
-    const { data } = await sbClient.from('audit_logs').select('*, users (name)').eq('workspace_id', S.workspaceId).order('created_at', { ascending: false }).limit(50);
+    const { data } = await sbClient.from('audit_logs').select('*, users (name)')[S.workspaceId ? 'eq' : 'is']('workspace_id', S.workspaceId || null).order('created_at', { ascending: false }).limit(50);
     return data.map(d => ({ ...d, user_name: d.users?.name || 'Unknown' }));
   }
   
   if (path === '/notifications' && method === 'GET') {
-    const { data } = await sbClient.from('notifications').select('*').eq('user_id', S.user.id).eq('workspace_id', S.workspaceId).order('created_at', { ascending: false });
+    const { data } = await sbClient.from('notifications').select('*').eq('user_id', S.user.id)[S.workspaceId ? 'eq' : 'is']('workspace_id', S.workspaceId || null).order('created_at', { ascending: false });
     return data;
   }
   
@@ -226,7 +226,7 @@ async function api(method, path, body) {
       const prefix = isLead ? 'lead_' : '';
       const pId = isLead ? 'lead_id' : 'tender_id';
       
-      const { data: main } = await sbClient.from(table).select('*').eq('workspace_id', S.workspaceId);
+      const { data: main } = await sbClient.from(table).select('*')[S.workspaceId ? 'eq' : 'is']('workspace_id', S.workspaceId || null);
       if (!main) return [];
       
       const [docs, tech, ph3, ph4, inv, cyc, cir] = await Promise.all([
@@ -469,15 +469,18 @@ async function init() {
     S.user = await api('GET', '/auth/me');
     if (!S.user) return showLogin();
     
-    const { data: ws, error: wsError } = await sbClient.from('workspaces').select('*');
-    if (wsError) console.error("Workspace fetch error:", wsError);
-    S.workspaces = ws && ws.length ? ws : [
-      { id: 'IPNET-fallback', name: 'IPNET' },
-      { id: 'ACIPL-fallback', name: 'ACIPL' }
-    ];
+    let ws = [];
+    if (S.user.role === 'admin') {
+      const { data } = await sbClient.from('workspaces').select('*');
+      ws = data || [];
+    } else {
+      const { data } = await sbClient.from('workspace_users').select('workspaces(*)').eq('user_id', S.user.id);
+      ws = data ? data.map(d => d.workspaces).filter(Boolean) : [];
+    }
+    S.workspaces = ws;
     if (!S.workspaceId || !S.workspaces.find(w => w.id === S.workspaceId)) {
-      S.workspaceId = S.workspaces.find(w => w.name === 'IPNET')?.id || S.workspaces[0].id;
-      localStorage.setItem('_ws', S.workspaceId);
+      S.workspaceId = S.workspaces.find(w => w.name === 'IPNET')?.id || (S.workspaces[0] ? S.workspaces[0].id : null);
+      if (S.workspaceId) localStorage.setItem('_ws', S.workspaceId);
     }
     
     await loadAll();
@@ -1396,17 +1399,192 @@ function PageBilling() {
 // ---- Admin Page ----
 function PageAdmin() {
   return `
-    <div class="page-header">
-      <div class="page-title">Administration</div>
-      <div class="page-actions">
-        <button class="btn btn-outline" id="btnExportTendersAdmin" onclick="openExportModal('tenders')">Export Tenders</button>
-        <button class="btn btn-outline" id="btnExportLeadsAdmin" onclick="openExportModal('leads')">Export Leads</button>
-      </div>
+    <div class="header-row">
+      <h2>Administration</h2>
     </div>
     <div class="tabs">
-      ${['users','audit'].map(t=>`<button class="tab-btn ${S.adminTab===t?'active':''}" data-atab="${t}">${{users:'Users',audit:'Audit Log'}[t]}</button>`).join('')}
+      <button class="tab-btn ${S.adminTab==='users'?'active':''}" onclick="S.adminTab='users';render()">Users</button>
+      <button class="tab-btn ${S.adminTab==='audit'?'active':''}" onclick="S.adminTab='audit';render()">Audit Logs</button>
+      <button class="tab-btn ${S.adminTab==='workspaces'?'active':''}" onclick="S.adminTab='workspaces';render()">Workspaces</button>
     </div>
-    <div id="atab-content">${renderAdminTab()}</div>`;
+    ${S.adminTab === 'users' ? `
+      <!-- Users list -->
+      <div class="card p-24" style="margin-bottom: 24px; display: flex; gap: 12px; align-items: flex-end;">
+        <div style="flex:1">
+          <label class="form-label">Name</label>
+          <input type="text" id="nu-name" class="form-control" placeholder="New User Name">
+        </div>
+        <div style="flex:1">
+          <label class="form-label">Email</label>
+          <input type="email" id="nu-email" class="form-control" placeholder="user@company.com">
+        </div>
+        <div style="flex:1">
+          <label class="form-label">Role</label>
+          <select id="nu-role" class="form-control">
+            <option value="lead_manager">Phase 1 & 3: Lead Manager</option>
+            <option value="tender_manager">Phase 1 & 3: Tender Manager</option>
+            <option value="technical">Phase 2 & 4: Technical</option>
+            <option value="billing">Phase 5: Billing & Accounts</option>
+            <option value="admin">Administrator</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="createUser()">Add User</button>
+      </div>
+      <div class="card p-24">
+        <table class="table">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${S.users.map(u => `
+              <tr>
+                <td>${esc(u.name)}</td>
+                <td>${esc(u.email)}</td>
+                <td><span class="status-badge ${u.role==='admin'?'b-purple':'b-blue'}">${roleLabel(u.role)}</span></td>
+                <td><span class="status-badge ${u.status==='active'?'b-green':'b-red'}">${u.status}</span></td>
+                <td>
+                  <button class="icon-btn" onclick="toggleUserStatus('${u.id}', '${u.status}')" title="${u.status==='active'?'Deactivate':'Activate'}">${u.status==='active'?'⏻':'✓'}</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : S.adminTab === 'audit' ? `
+      <div class="card p-24">
+        <table class="table">
+          <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+          <tbody>
+            ${S.audit.map(a => `
+              <tr>
+                <td><div class="table-subtext">${fmtDate(a.created_at)}</div></td>
+                <td>${esc(a.user_name||'')}</td>
+                <td>${esc(a.action)}</td>
+                <td>${esc(a.entity_type)}</td>
+                <td><div class="table-subtext">${JSON.stringify(a.details)}</div></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : renderAdminWorkspaces()}
+  `;
+}
+
+function renderAdminWorkspaces() {
+  return `
+    <div class="card p-24" style="margin-bottom: 24px; display: flex; gap: 12px; align-items: flex-end;">
+      <div style="flex:1">
+        <label class="form-label">Workspace Name</label>
+        <input type="text" id="nw-name" class="form-control" placeholder="New Workspace Name">
+      </div>
+      <div style="flex:1">
+        <label class="form-label">Workspace ID (Optional)</label>
+        <input type="text" id="nw-id" class="form-control" placeholder="e.g. NEW_WS">
+      </div>
+      <button class="btn btn-primary" onclick="createWorkspace()">Add Workspace</button>
+    </div>
+    <div class="card p-24">
+      <table class="table">
+        <thead><tr><th>Workspace ID</th><th>Name</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${(S.workspaces || []).map(w => `
+            <tr>
+              <td>${esc(w.id)}</td>
+              <td>${esc(w.name)}</td>
+              <td>
+                <button class="btn btn-sm btn-secondary" onclick="openManageAccess('${w.id}')">Manage Access</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function createWorkspace() {
+  const name = document.getElementById('nw-name').value.trim();
+  let id = document.getElementById('nw-id').value.trim();
+  if (!name) return typeof toast !== 'undefined' ? toast('Name is required', 'error') : alert('Name required');
+  if (!id) id = name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 10);
+  
+  try {
+    const { data, error } = await sbClient.from('workspaces').insert({ id, name }).select();
+    if (error) throw error;
+    
+    await sbClient.from('workspace_users').insert({ workspace_id: id, user_id: S.user.id });
+    
+    S.workspaces.push({ id, name });
+    render();
+    if (typeof toast !== 'undefined') toast('Workspace created', 'success');
+  } catch(e) {
+    if (typeof toast !== 'undefined') toast('Error: ' + e.message, 'error');
+    else alert('Error: ' + e.message);
+  }
+}
+
+async function openManageAccess(wsId) {
+  S.managingWorkspaceId = wsId;
+  S.managingWorkspaceUsers = [];
+  
+  try {
+    const { data, error } = await sbClient.from('workspace_users').select('user_id').eq('workspace_id', wsId);
+    if (error) throw error;
+    S.managingWorkspaceUsers = data ? data.map(d => d.user_id) : [];
+    renderManageAccessModal();
+  } catch(e) {
+    if (typeof toast !== 'undefined') toast('Failed to load workspace access: ' + e.message, 'error');
+  }
+}
+
+function renderManageAccessModal() {
+  const ws = S.workspaces.find(w => w.id === S.managingWorkspaceId);
+  const body = `
+    <div style="max-height: 400px; overflow-y: auto;">
+      <table class="table">
+        <thead><tr><th>User</th><th>Email</th><th>Access</th></tr></thead>
+        <tbody>
+          ${(S.users || []).map(u => {
+            const hasAccess = S.managingWorkspaceUsers.includes(u.id);
+            const isAdmin = u.role === 'admin';
+            return `
+              <tr>
+                <td>${esc(u.name)}</td>
+                <td>${esc(u.email)}</td>
+                <td>
+                  <div class="switch-container">
+                    <label class="switch">
+                      <input type="checkbox" ${hasAccess || isAdmin ? 'checked' : ''} 
+                             ${isAdmin ? 'disabled title="Admins always have access"' : ''}
+                             onchange="toggleWorkspaceAccess('${u.id}', this.checked)">
+                      <span class="slider round"></span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  
+  showModal(MW(`Manage Access: ${esc(ws?.name || '')}`, body, `<button class="btn btn-ghost" onclick="removeModal()">Close</button>`));
+}
+
+async function toggleWorkspaceAccess(userId, hasAccess) {
+  try {
+    if (!hasAccess) {
+      const { error } = await sbClient.from('workspace_users').delete().match({ workspace_id: S.managingWorkspaceId, user_id: userId });
+      if (error) throw error;
+      S.managingWorkspaceUsers = S.managingWorkspaceUsers.filter(id => id !== userId);
+    } else {
+      const { error } = await sbClient.from('workspace_users').insert({ workspace_id: S.managingWorkspaceId, user_id: userId });
+      if (error) throw error;
+      S.managingWorkspaceUsers.push(userId);
+    }
+  } catch(e) {
+    if (typeof toast !== 'undefined') toast('Failed to update access: ' + e.message, 'error');
+  }
 }
 
 function renderAdminTab() {
@@ -2818,5 +2996,108 @@ window.calcTotal = function() {
 // ---- Run ----
 init();
 
+function renderAdminWorkspaces() {
+  return `
+    <div class="card p-24" style="margin-bottom: 24px; display: flex; gap: 12px; align-items: flex-end;">
+      <div style="flex:1">
+        <label class="form-label">Workspace Name</label>
+        <input type="text" id="nw-name" class="form-control" placeholder="New Workspace (e.g. GLOBO)">
+      </div>
+      <button class="btn btn-primary" onclick="createWorkspace()">Add Workspace</button>
+    </div>
+    <div class="card p-24">
+      <table class="table">
+        <thead><tr><th>Name</th><th>ID</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${S.workspaces.map(w => `
+            <tr>
+              <td><strong>${esc(w.name)}</strong></td>
+              <td><div class="table-subtext">${w.id}</div></td>
+              <td>
+                <button class="btn btn-secondary" onclick="manageWorkspaceAccess('${w.id}', '${esc(w.name)}')">Manage Access</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
 
+window.createWorkspace = async function() {
+  const name = document.getElementById('nw-name').value.trim();
+  if (!name) return alert('Enter a workspace name');
+  try {
+    const { data, error } = await sbClient.from('workspaces').insert({ name }).select();
+    if (error) throw error;
+    await sbClient.from('workspace_users').insert({ workspace_id: data[0].id, user_id: S.user.id });
+    document.getElementById('nw-name').value = '';
+    await loadAll();
+    render();
+    alert('Workspace created successfully');
+  } catch (err) {
+    alert('Error creating workspace: ' + err.message);
+  }
+};
 
+window.manageWorkspaceAccess = async function(wsId, wsName) {
+  try {
+    const { data: mappings } = await sbClient.from('workspace_users').select('user_id').eq('workspace_id', wsId);
+    const assignedUserIds = new Set((mappings || []).map(m => m.user_id));
+    
+    const allUsers = [...S.users].sort((a, b) => {
+      if (a.role === 'admin' && b.role !== 'admin') return -1;
+      if (a.role !== 'admin' && b.role === 'admin') return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    const mHTML = `
+      <div class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+          <h3>Manage Access: ${wsName}</h3>
+          <p class="table-subtext" style="margin-bottom: 16px;">Admins automatically have access to all workspaces, but standard users must be explicitly granted access here.</p>
+          <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+            ${allUsers.map(u => {
+              const isAdmin = u.role === 'admin';
+              const isAssigned = assignedUserIds.has(u.id);
+              return `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                  <div>
+                    <strong>${esc(u.name)}</strong> (${esc(u.email)})
+                    <span class="status-badge ${isAdmin ? 'b-purple' : 'b-blue'}" style="margin-left: 8px;">${roleLabel(u.role)}</span>
+                  </div>
+                  <div>
+                    <label style="display: flex; align-items: center; cursor: ${isAdmin ? 'not-allowed' : 'pointer'};">
+                      <input type="checkbox" id="wsa_${u.id}" ${isAdmin || isAssigned ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} style="margin-right: 8px;" onchange="toggleWorkspaceAccess('${wsId}', '${u.id}', this.checked)">
+                      ${isAdmin ? 'Auto Access' : (isAssigned ? 'Revoke' : 'Grant')}
+                    </label>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div style="margin-top: 24px; text-align: right;">
+            <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+          </div>
+        </div>
+      </div>
+    `;
+    S.modal = mHTML;
+    render();
+  } catch (err) {
+    alert('Error loading workspace access: ' + err.message);
+  }
+};
+
+window.toggleWorkspaceAccess = async function(wsId, userId, grant) {
+  try {
+    if (grant) {
+      await sbClient.from('workspace_users').insert({ workspace_id: wsId, user_id: userId, granted_by: S.user.id });
+    } else {
+      await sbClient.from('workspace_users').delete().eq('workspace_id', wsId).eq('user_id', userId);
+    }
+  } catch (err) {
+    console.error('Error toggling access:', err);
+    alert('Failed to update access. Check permissions.');
+  }
+};
