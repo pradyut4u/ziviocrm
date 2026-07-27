@@ -668,7 +668,7 @@ function showLogin() {
                 </span>
                 <div>
                   <div class="si-trusted-title">Enterprise-grade security</div>
-                  <div class="si-trusted-sub">SOC 2 Type II â€¢ GDPR Compliant</div>
+                  <div class="si-trusted-sub">SOC 2 Type II • GDPR Compliant</div>
                 </div>
               </div>
             </div>
@@ -697,7 +697,7 @@ function showLogin() {
                   <span class="si-input-icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                   </span>
-                  <input class="si-input" type="password" id="lp" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" autocomplete="current-password" required>
+                  <input class="si-input" type="password" id="lp" placeholder="••••••••" autocomplete="current-password" required>
                   <button type="button" class="si-pw-toggle" id="lshow">Show</button>
                 </div>
               </div>
@@ -1655,7 +1655,7 @@ function PageDetail() {
   if (tabs.length > 0 && !tabs.find(tb=>tb.k===S.tab)) S.tab = tabs[0].k;
 
   return `
-    <button class="back-btn" id="backTenderBtn">â† Back</button>
+    <button class="back-btn" id="backTenderBtn">← Back</button>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px;flex-wrap:wrap">
       <div>
         <h1 style="font-size:19px;font-weight:800;margin-bottom:6px">${esc(t.title)}</h1>
@@ -2011,7 +2011,7 @@ function LeadDetail() {
   if (tabs.length > 0 && !tabs.find(tb=>tb.k===S.tab)) S.tab = tabs[0].k;
 
   return `
-    <button class="back-btn" id="backLeadBtn">â† Back</button>
+    <button class="back-btn" id="backLeadBtn">← Back</button>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px;flex-wrap:wrap">
       <div>
         <h1 style="font-size:19px;font-weight:800;margin-bottom:6px">${esc(t.title)}</h1>
@@ -2319,7 +2319,7 @@ function removeModal() { $('mwrap')?.remove(); }
 function MW(title, body, footer, size='') {
   return `<div class="modal-overlay"><div class="modal ${size}">
     <div class="modal-header"><div class="modal-title">${title}</div>
-      <button class="modal-close" id="mclose">âœ•</button></div>
+      <button class="modal-close" id="mclose">✖</button></div>
     <div class="modal-body">${body}</div>
     <div class="modal-footer">${footer}</div>
   </div></div>`;
