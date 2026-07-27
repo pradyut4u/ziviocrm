@@ -1,10 +1,11 @@
 // ============================================================
-// TENDEROPS â€” ISP Tender Management System (Vanilla JS SPA)
+// TENDEROPS — ISP Tender Management System (Vanilla JS SPA)
 // ============================================================
 
 // ---- State ----
 const S = {
   user: null, token: localStorage.getItem('_tok'),
+  workspaceId: localStorage.getItem('_ws') || null, workspaces: [],
   page: 'dashboard', tenderId: null, tab: 'tender_info',
   adminTab: 'users', tenders: [], tender: null,
   users: [], audit: [], notifications: [], unread: 0,
@@ -79,7 +80,7 @@ function toast(msg, type = 'info') {
 function fmt(val, type) {
   if (val === null || val === undefined || val === '') return '<span style="color:var(--text3)">-</span>';
   if (type === 'date') { try { return new Date(val).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); } catch { return val; } }
-  if (type === 'currency') return 'â‚¹' + parseFloat(val).toLocaleString('en-IN');
+  if (type === 'currency') return '₹' + parseFloat(val).toLocaleString('en-IN');
   if (type === 'size') { const s=parseInt(val)||0; return s>1048576?(s/1048576).toFixed(1)+' MB':(s/1024).toFixed(0)+' KB'; }
   return esc(val);
 }
@@ -91,20 +92,20 @@ function timeAgo(d) {
 }
 
 function fileIcon(mime) {
-  if (!mime) return 'ðŸ“Ž'; mime = String(mime).toLowerCase();
-  if (mime.includes('pdf')) return 'ðŸ“„';
+  if (!mime) return '📎'; mime = String(mime).toLowerCase();
+  if (mime.includes('pdf')) return '📄';
   if (mime.includes('word')||mime.includes('doc')) return 'ðŸ“';
-  if (mime.includes('excel')||mime.includes('sheet')||mime.includes('xls')) return 'ðŸ“Š';
-  if (mime.includes('image')) return 'ðŸ–¼ï¸'; return 'ðŸ“Ž';
+  if (mime.includes('excel')||mime.includes('sheet')||mime.includes('xls')) return '📊';
+  if (mime.includes('image')) return 'ðŸ–¼ï¸'; return '📎';
 }
 
 function stageBadge(stage) {
   const m = {
-    ph1_draft:['b-gray','â—‹ Ph1 Draft'], ph1_complete:['b-blue','â— Ph1 Complete'],
-    ph2_active:['b-purple','âš™ Ph2 Active'], ph2_complete:['b-cyan','âœ“ Ph2 Complete'],
-    ph3_active:['b-amber','âš– Ph3 Awarding'], ph3_awarded:['b-green','âœ“ Ph3 Awarded'], ph3_disqualified:['b-red','â¨¯ Ph3 Disqualified'],
-    ph4_active:['b-blue','ðŸšš Ph4 Delivery'], ph4_complete:['b-cyan','âœ“ Ph4 Complete'],
-    ph5_active:['b-amber','â‚¹ Ph5 Billing'], closed:['b-green','â— Closed']
+    ph1_draft:['b-gray','○ Ph1 Draft'], ph1_complete:['b-blue','â— Ph1 Complete'],
+    ph2_active:['b-purple','⚙ Ph2 Active'], ph2_complete:['b-cyan','✓ Ph2 Complete'],
+    ph3_active:['b-amber','⚖ Ph3 Awarding'], ph3_awarded:['b-green','✓ Ph3 Awarded'], ph3_disqualified:['b-red','⨯ Ph3 Disqualified'],
+    ph4_active:['b-blue','🚚 Ph4 Delivery'], ph4_complete:['b-cyan','✓ Ph4 Complete'],
+    ph5_active:['b-amber','₹ Ph5 Billing'], closed:['b-green','â— Closed']
   }[stage] || ['b-gray', stage];
   return `<span class="badge ${m[0]}">${m[1]}</span>`;
 }
@@ -130,11 +131,11 @@ function getPrefix(path) {
 }
 
 async function audit(action, type, id, details = {}) {
-  await sbClient.from('audit_logs').insert({ action, entity_type: type, entity_id: id, user_id: S.user.id, details });
+  await sbClient.from('audit_logs').insert({ action, entity_type: type, entity_id: id, user_id: S.user.id, details, workspace_id: S.workspaceId });
 }
 
 async function notify(userId, title, message, type = 'info', linkId = null) {
-  await sbClient.from('notifications').insert({ user_id: userId, title, message, type, link_id: linkId });
+  await sbClient.from('notifications').insert({ user_id: userId, title, message, type, link_id: linkId, workspace_id: S.workspaceId });
 }
 
 async function notifyRole(roleName, title, message, type = 'info', linkId = null) {
@@ -185,7 +186,7 @@ async function api(method, path, body) {
     const table = path === '/tenders' ? 'tenders' : 'leads';
     const p3Table = path === '/tenders' ? 'phase3_records' : 'lead_phase3_records';
     if (method === 'GET') {
-      const { data } = await sbClient.from(table).select(`*, ${p3Table}(quoted_bid_value)`);
+      const { data } = await sbClient.from(table).select(`*, ${p3Table}(quoted_bid_value)`).eq('workspace_id', S.workspaceId);
       const eType = path === '/tenders' ? 'tender' : 'lead';
       const { data: cir } = await sbClient.from('circuits').select('*').eq('parent_type', eType);
       if (data) {
@@ -198,19 +199,19 @@ async function api(method, path, body) {
       return data;
     }
     if (method === 'POST') {
-      const { data } = await sbClient.from(table).insert({...body, created_by: S.user.id}).select();
+      const { data } = await sbClient.from(table).insert({...body, created_by: S.user.id, workspace_id: S.workspaceId}).select();
       await audit('create', table.slice(0, -1), data[0].id);
       return data[0];
     }
   }
   
   if (path === '/audit' && method === 'GET') {
-    const { data } = await sbClient.from('audit_logs').select('*, users (name)').order('created_at', { ascending: false }).limit(50);
+    const { data } = await sbClient.from('audit_logs').select('*, users (name)').eq('workspace_id', S.workspaceId).order('created_at', { ascending: false }).limit(50);
     return data.map(d => ({ ...d, user_name: d.users?.name || 'Unknown' }));
   }
   
   if (path === '/notifications' && method === 'GET') {
-    const { data } = await sbClient.from('notifications').select('*').eq('user_id', S.user.id).order('created_at', { ascending: false });
+    const { data } = await sbClient.from('notifications').select('*').eq('user_id', S.user.id).eq('workspace_id', S.workspaceId).order('created_at', { ascending: false });
     return data;
   }
   
@@ -225,7 +226,7 @@ async function api(method, path, body) {
       const prefix = isLead ? 'lead_' : '';
       const pId = isLead ? 'lead_id' : 'tender_id';
       
-      const { data: main } = await sbClient.from(table).select('*');
+      const { data: main } = await sbClient.from(table).select('*').eq('workspace_id', S.workspaceId);
       if (!main) return [];
       
       const [docs, tech, ph3, ph4, inv, cyc, cir] = await Promise.all([
@@ -307,7 +308,7 @@ async function api(method, path, body) {
     }
     
     if (sub === 'phase2' && method === 'POST') {
-      await sbClient.from(prefix + 'technical_reports').insert({ ...body, [isLead ? 'lead_id' : 'tender_id']: id, created_by: S.user.id });
+      await sbClient.from(prefix + 'technical_reports').insert({ ...body, [isLead ? 'lead_id' : 'tender_id']: id, created_by: S.user.id, workspace_id: S.workspaceId });
       await sbClient.from(table).update({ stage: 'ph3_active' }).eq('id', id);
       await audit('report.submit', eType, id);
       const eName = isLead ? S.leadItem?.title : S.tender?.bid_number;
@@ -316,7 +317,7 @@ async function api(method, path, body) {
     }
     
     if (sub === 'phase3' && method === 'POST') {
-      await sbClient.from(prefix + 'phase3_records').insert({ ...body, [isLead ? 'lead_id' : 'tender_id']: id, created_by: S.user.id });
+      await sbClient.from(prefix + 'phase3_records').insert({ ...body, [isLead ? 'lead_id' : 'tender_id']: id, created_by: S.user.id, workspace_id: S.workspaceId });
       // Circuit Generation for Awarded Phase 3 (Exactly 1 circuit)
       const newStage = body.qualification_result === 'Awarded' ? 'ph4_active' : (body.qualification_result === 'Qualified' ? 'ph3_active' : 'ph3_disqualified');
       await sbClient.from(table).update({ stage: newStage }).eq('id', id);
@@ -340,7 +341,7 @@ async function api(method, path, body) {
         }
         
         await sbClient.from('circuits').insert([{
-          parent_id: id, parent_type: isLead ? 'lead' : 'tender', circuit_id: `IPN${seqKey}-${nextVal}`
+          parent_id: id, parent_type: isLead ? 'lead' : 'tender', circuit_id: `IPN${seqKey}-${nextVal}`, workspace_id: S.workspaceId
         }]);
       }
 
@@ -353,7 +354,7 @@ async function api(method, path, body) {
     }
     
     if (sub === 'payment-cycles' && method === 'POST') {
-      await sbClient.from(prefix + 'payment_cycles').insert({ ...body, [isLead ? 'lead_id' : 'tender_id']: id, created_by: S.user.id });
+      await sbClient.from(prefix + 'payment_cycles').insert({ ...body, [isLead ? 'lead_id' : 'tender_id']: id, created_by: S.user.id, workspace_id: S.workspaceId });
       return { success: true };
     }
     
@@ -382,7 +383,7 @@ async function up(path, fd) {
   if (sub === 'documents') {
     const fileData = await uploadFile(fd.get('file'));
     await sbClient.from(prefix + (isLead ? 'documents' : 'tender_documents')).insert({
-      [pId]: id, name: fileData.name, stored: fileData.stored, url: fileData.url, size: fileData.size, mime: fileData.mime, uploaded_by: S.user.id
+      [pId]: id, name: fileData.name, stored: fileData.stored, url: fileData.url, size: fileData.size, mime: fileData.mime, uploaded_by: S.user.id, workspace_id: S.workspaceId
     });
     await audit('doc.upload', eType, id, { name: fileData.name });
     return { success: true };
@@ -392,7 +393,7 @@ async function up(path, fd) {
     const fDoc = await uploadFile(fd.get('feasibility_doc'));
     const sDoc = await uploadFile(fd.get('site_survey_doc'));
     await sbClient.from(prefix + 'technical_reports').insert({
-      [pId]: id, submitted_by: S.user.id,
+      [pId]: id, submitted_by: S.user.id, workspace_id: S.workspaceId,
       feasibility_status: fd.get('feasibility_status'),
       survey_notes: fd.get('survey_notes'),
       service_provider: fd.get('service_provider'),
@@ -417,7 +418,7 @@ async function up(path, fd) {
     const aDoc = await uploadFile(fd.get('acceptance_form'));
     const cDoc = await uploadFile(fd.get('completion_cert'));
     await sbClient.from(prefix + 'phase4_records').insert({
-      [pId]: id, created_by: S.user.id,
+      [pId]: id, created_by: S.user.id, workspace_id: S.workspaceId,
       delivery_date: fd.get('delivery_date'),
       delivery_notes: fd.get('delivery_notes'),
       ipv4_addresses: fd.get('ipv4_addresses') ? JSON.parse(fd.get('ipv4_addresses')) : null,
@@ -436,7 +437,7 @@ async function up(path, fd) {
   if (sub === 'phase5') {
     const invDoc = await uploadFile(fd.get('invoice_upload'));
     await sbClient.from(prefix + 'invoices').insert({
-      [pId]: id, created_by: S.user.id,
+      [pId]: id, created_by: S.user.id, workspace_id: S.workspaceId,
       invoice_number: fd.get('invoice_number'),
       notif_to_tender_date: fd.get('notif_to_tender_date') || fd.get('notif_to_lead_date'), // handle both
       award_date: fd.get('award_date'),
@@ -467,12 +468,33 @@ async function init() {
   try {
     S.user = await api('GET', '/auth/me');
     if (!S.user) return showLogin();
+    
+    const { data: ws, error: wsError } = await sbClient.from('workspaces').select('*');
+    if (wsError) console.error("Workspace fetch error:", wsError);
+    S.workspaces = ws && ws.length ? ws : [
+      { id: 'IPNET-fallback', name: 'IPNET' },
+      { id: 'ACIPL-fallback', name: 'ACIPL' }
+    ];
+    if (!S.workspaceId || !S.workspaces.find(w => w.id === S.workspaceId)) {
+      S.workspaceId = S.workspaces.find(w => w.name === 'IPNET')?.id || S.workspaces[0].id;
+      localStorage.setItem('_ws', S.workspaceId);
+    }
+    
     await loadAll();
     setupRealtime();
     setInterval(loadNotifs, 30000);
     render();
   } catch { localStorage.removeItem('_tok'); showLogin(); }
 }
+
+window.switchWorkspace = async function(id) {
+  S.workspaceId = id;
+  localStorage.setItem('_ws', id);
+  S.tenderId = null;
+  S.leadId = null;
+  await loadAll();
+  render();
+};
 
 function setupRealtime() {
   if (!window.subscribeToTable) return;
@@ -796,8 +818,8 @@ function render() {
 function Sidebar() {
   const role = S.user?.role;
   const items = [
-    {p:'dashboard',l:'Dashboard',i:'âŠž',all:true},
-    {p:'admin',l:'Admin Panel',i:'â—ˆ',roles:['admin']},
+    {p:'dashboard',l:'Dashboard',i:'⊞',all:true},
+    {p:'admin',l:'Admin Panel',i:'◈',roles:['admin']},
   ].filter(x => x.all || x.roles?.includes(role));
   return `
     <aside class="sidebar">
@@ -815,7 +837,7 @@ function Sidebar() {
       <div class="sidebar-footer">
         <div class="avatar">${(S.user?.name||'U')[0].toUpperCase()}</div>
         <div style="flex:1;min-width:0"><div class="user-name">${esc(S.user?.name||'')}</div><div class="user-role">${roleLabel(role)}</div></div>
-        <button class="logout-btn" id="logoutBtn" title="Logout">â»</button>
+        <button class="logout-btn" id="logoutBtn" title="Logout">⏻</button>
       </div>
     </aside>`;
 }
@@ -824,10 +846,14 @@ function Header() {
   const t = {dashboard:'Dashboard',tenders:'Phase 1 & 3: Tenders',leads:'Phase 1 & 3: Leads',technical:'Phase 2 & 4: Technical',billing:'Phase 5: Billing & Accounts',admin:'Administration'}[S.page]||'ZivioCRM';
   return `
     <header class="topbar">
-      <button class="icon-btn mobile-only" id="menuBtn" title="Menu" style="margin-right: 12px; font-size: 18px;">â˜°</button>
+      <button class="icon-btn mobile-only" id="menuBtn" title="Menu" style="margin-right: 12px; font-size: 18px;">☰</button>
       <div class="topbar-title">${t}</div>
+      <div style="flex:1"></div>
+      <select id="workspaceSwitcher" onchange="window.switchWorkspace(this.value)" style="margin-right: 20px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 500; font-size: 14px; cursor: pointer; min-width: 100px;">
+        ${S.workspaces.map(ws => `<option value="${ws.id}" ${ws.id === S.workspaceId ? 'selected' : ''}>${esc(ws.name)}</option>`).join('')}
+      </select>
       <div class="page-actions">
-        <button class="icon-btn" id="nb-btn" title="Notifications">ðŸ””
+        <button class="icon-btn" id="nb-btn" title="Notifications">🔔
           <span class="notif-badge" id="nb" style="display:${S.unread?'flex':'none'}">${S.unread}</span>
         </button>
       </div>
@@ -852,7 +878,7 @@ function Pipeline(stage) {
     const cls = active ? (stage === 'ph3_disqualified' ? 'active-error' : 'active') : done ? 'done' : '';
     const label = (stage === 'ph3_disqualified' && si === 2) ? 'Disqualified' : step.l;
     html += `<div class="pip-step"><div class="pip-node">
-      <div class="pip-dot ${cls}">${done?'âœ“':(stage==='ph3_disqualified'&&si===2)?'â¨¯':si+1}</div>
+      <div class="pip-dot ${cls}">${done?'✓':(stage==='ph3_disqualified'&&si===2)?'⨯':si+1}</div>
       <div class="pip-lbl ${cls}">${label}</div>
     </div></div>`;
     if (si < STEPS.length-1) html += `<div class="pip-line ${done?'done':''}"></div>`;
@@ -957,7 +983,7 @@ function PageDashboard() {
               </tbody>
             </table>
           </div>` : 
-          `<div class="empty"><div class="empty-icon">ðŸ“‹</div><div class="empty-title">No leads yet</div>
+          `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No leads yet</div>
            <div class="empty-sub">Create your first lead to get started</div></div>`}
       </div>`;
   };
@@ -1010,7 +1036,7 @@ function PageDashboard() {
               </tbody>
             </table>
           </div>` : 
-          `<div class="empty"><div class="empty-icon">ðŸ“‹</div><div class="empty-title">No tenders yet</div>
+          `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No tenders yet</div>
            <div class="empty-sub">Create your first tender to get started</div></div>`}
       </div>`;
   };
@@ -1091,9 +1117,9 @@ function renderAnalytics() {
   });
 
   const formatRev = (v) => {
-    if (v >= 10000000) return 'â‚¹' + (v / 10000000).toFixed(2) + ' Cr';
-    if (v >= 100000) return 'â‚¹' + (v / 100000).toFixed(2) + ' L';
-    return 'â‚¹' + v.toLocaleString('en-IN');
+    if (v >= 10000000) return '₹' + (v / 10000000).toFixed(2) + ' Cr';
+    if (v >= 100000) return '₹' + (v / 100000).toFixed(2) + ' L';
+    return '₹' + v.toLocaleString('en-IN');
   };
 
   // Pipeline Data
@@ -1240,7 +1266,7 @@ function PageTenders() {
             <td style="font-size:11px;color:var(--text2);font-weight:600">${esc(t.bid_number||'-')}</td>
             <td>${esc(t.requirements?.order_number || '-')}</td>
             <td><div class="tbl-link">${esc(t.title)}</div></td>
-            <td>${esc(t.org_name||'â€”')}</td><td>${stageBadge(t.stage)}</td>
+            <td>${esc(t.org_name||'—')}</td><td>${stageBadge(t.stage)}</td>
             <td style="font-weight:700">${fmt(t.quoted_bid_value,'currency')}</td>
             <td>${fmt(t.bid_end_datetime,'date')}</td>
           </tr>`).join('')}
@@ -1291,7 +1317,7 @@ function PageTechnical() {
           </tr>`).join('')}
         </tbody>
       </table></div>`:
-      `<div class="empty"><div class="empty-icon">âš™</div><div class="empty-title">No technical tasks for tenders</div></div>`}
+      `<div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">No technical tasks for tenders</div></div>`}
       
     <div class="sec-title" style="margin-top:32px;">Leads</div>
     ${lList.length?`
@@ -1323,7 +1349,7 @@ function PageTechnical() {
           </tr>`).join('')}
         </tbody>
       </table></div>`:
-      `<div class="empty"><div class="empty-icon">âš™</div><div class="empty-title">No technical tasks for leads</div></div>`}
+      `<div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">No technical tasks for leads</div></div>`}
   `;
 }
 
@@ -1405,7 +1431,7 @@ function renderAdminTab() {
         <td style="font-size:12px;color:var(--text2)">${esc(l.entity_type)}</td>
         <td style="font-size:11px;color:var(--text3)">${(l.user_id||'').slice(0,8)}</td></tr>`;
       }).join('')}
-      ${!S.audit.length?`<tr><td colspan="4"><div class="empty"><div class="empty-icon">ðŸ“‹</div><div class="empty-title">No logs yet</div></div></td></tr>`:''}
+      ${!S.audit.length?`<tr><td colspan="4"><div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No logs yet</div></div></td></tr>`:''}
       </tbody>
     </table></div>`;
 
@@ -1541,7 +1567,7 @@ function TabTenderInfo(t, role) {
           ${inputGroup('pre_bid_datetime','Pre-Bid Date & Time',t.pre_bid_datetime,'datetime-local',edit)}
           <div class="sec-title" style="grid-column:1/-1;margin-top:12px;margin-bottom:8px">Tender Requirements</div>
           ${inputGroup('contract_period','Contract Period',t.contract_period,'text',edit)}
-          ${inputGroup('est_bid_value','Estimated Bid Value (â‚¹)',t.est_bid_value,'number',edit)}
+          ${inputGroup('est_bid_value','Estimated Bid Value (₹)',t.est_bid_value,'number',edit)}
           ${inputGroup('payment_terms','Payment Terms',t.payment_terms,'text',edit)}
           ${inputGroup('service_type','Type of Service',t.service_type,'select',edit,['','ILL','MPLS','BroadBand','P2P','NLD'])}
           ${inputGroup('bandwidth_mbps','Bandwidth (Mbps)',t.bandwidth_mbps,'number',edit)}
@@ -1609,7 +1635,7 @@ function TabTechnical(t, role) {
 
       <div class="card">
         <div class="sec-title">Phase 2: Technical Review</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">âš™</div><div class="empty-title">Pending Technical Report</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">Pending Technical Report</div></div>` : `
         <div class="grid g2">
             ${inputGroup('r_sp','Service Provider',r.service_provider)}
             ${inputGroup('r_sdate','Survey Date',r.survey_date)}
@@ -1627,8 +1653,8 @@ function TabTechnical(t, role) {
         </div>
         <div style="margin-top:16px">
             <div style="font-weight:600;margin-bottom:8px">Uploaded Reports:</div>
-            ${r.feasibility_doc_url ? `<a href="${r.feasibility_doc_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Feasibility Doc</a>` : ''}
-            ${r.site_survey_doc_url ? `<a href="${r.site_survey_doc_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Site Survey Doc</a>` : ''}
+            ${r.feasibility_doc_url ? `<a href="${r.feasibility_doc_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Feasibility Doc</a>` : ''}
+            ${r.site_survey_doc_url ? `<a href="${r.site_survey_doc_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Site Survey Doc</a>` : ''}
         </div>
         `}
       </div>
@@ -1642,7 +1668,7 @@ function TabAward(t, role) {
     return `
       <div class="card">
         <div class="sec-title">Phase 3: Award / Qualification</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">âš–</div><div class="empty-title">Pending Award Decision</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">⚖</div><div class="empty-title">Pending Award Decision</div></div>` : `
         <div class="grid g2">
             ${inputGroup('p3_res','Qualification Result',r.qualification_result)}
             ${inputGroup('p3_qval','Quoted Bid Value',r.quoted_bid_value)}
@@ -1665,7 +1691,7 @@ function TabDelivery(t, role) {
     return `
       <div class="card">
         <div class="sec-title">Phase 4: Technical Delivery</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">ðŸšš</div><div class="empty-title">Pending Delivery</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">🚚</div><div class="empty-title">Pending Delivery</div></div>` : `
         <div class="grid g2">
             ${inputGroup('p4_ad','Actual Delivery Date',r.delivery_date)}
             ${inputGroup('p4_rem','Delivery Notes',r.delivery_notes,'textarea')}
@@ -1704,8 +1730,8 @@ function TabDelivery(t, role) {
         ` : ''}
         <div style="margin-top:16px">
             <div style="font-weight:600;margin-bottom:8px">Documents:</div>
-            ${r.acceptance_form_url ? `<a href="${r.acceptance_form_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Acceptance Form</a>` : ''}
-            ${r.completion_cert_url ? `<a href="${r.completion_cert_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Completion Certificate</a>` : ''}
+            ${r.acceptance_form_url ? `<a href="${r.acceptance_form_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Acceptance Form</a>` : ''}
+            ${r.completion_cert_url ? `<a href="${r.completion_cert_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Completion Certificate</a>` : ''}
         </div>
         `}
       </div>
@@ -1720,7 +1746,7 @@ function TabBilling(t, role) {
     const cycs = t.payment_cycles||[];
     
     const headHtml = !inv.id ? 
-      (edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary" data-modal="ph5-invoice">Create Invoice Header</button>` : `<div class="empty"><div class="empty-icon">â‚¹</div><div class="empty-title">Pending Invoice Creation</div></div>`) :
+      (edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary" data-modal="ph5-invoice">Create Invoice Header</button>` : `<div class="empty"><div class="empty-icon">₹</div><div class="empty-title">Pending Invoice Creation</div></div>`) :
       `<div class="grid g3">
           ${inputGroup('i_no','Invoice Number',inv.invoice_number)}
           ${inputGroup('i_nt','Notif to Tender Date',inv.notif_to_tender_date)}
@@ -1734,7 +1760,7 @@ function TabBilling(t, role) {
           ${inputGroup('i_dt','Duration To',inv.duration_to)}
           ${inputGroup('i_pc','Payment Cycle',inv.payment_cycle)}
       </div>
-      ${inv.invoice_upload_url ? `<div style="margin-top:12px"><a href="${inv.invoice_upload_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Invoice Document</a></div>` : ''}
+      ${inv.invoice_upload_url ? `<div style="margin-top:12px"><a href="${inv.invoice_upload_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Invoice Document</a></div>` : ''}
       `;
       
     let totalDue = cycs.reduce((a,c)=>a+parseFloat(c.amount_due||0),0);
@@ -1747,9 +1773,9 @@ function TabBilling(t, role) {
          ${edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary btn-sm" data-modal="ph5-cycle">+ Add Cycle</button>` : ''}
       </div>
       <div style="background:var(--bg2);padding:12px;border-radius:6px;display:flex;gap:24px;margin-bottom:16px;font-weight:600">
-         <div>Total Due: <span style="color:var(--text1)">â‚¹${totalDue.toLocaleString('en-IN')}</span></div>
-         <div>Total Received: <span style="color:var(--green)">â‚¹${totalRec.toLocaleString('en-IN')}</span></div>
-         <div>Balance: <span style="color:var(--red)">â‚¹${bal.toLocaleString('en-IN')}</span></div>
+         <div>Total Due: <span style="color:var(--text1)">₹${totalDue.toLocaleString('en-IN')}</span></div>
+         <div>Total Received: <span style="color:var(--green)">₹${totalRec.toLocaleString('en-IN')}</span></div>
+         <div>Balance: <span style="color:var(--red)">₹${bal.toLocaleString('en-IN')}</span></div>
       </div>
       <div class="table-wrap"><table>
          <thead><tr><th>Cycle</th><th>Period</th><th>Due</th><th>Status</th><th>Received</th><th>Pay Date</th>${edit?'<th>Act</th>':''}</tr></thead>
@@ -1792,7 +1818,7 @@ function PageLeads() {
           <tr class="tr-link" data-lnav="${t.id}">
             <td>${esc(t.requirements?.order_number || '-')}</td>
             <td><div class="tbl-link">${esc(t.title)}</div></td>
-            <td>${esc(t.org_name||'â€”')}</td><td>${stageBadge(t.stage)}</td>
+            <td>${esc(t.org_name||'—')}</td><td>${stageBadge(t.stage)}</td>
             <td style="font-weight:700">${fmt(t.quoted_bid_value,'currency')}</td>
             <td>${fmt(t.bid_end_datetime,'date')}</td>
           </tr>`).join('')}
@@ -1944,7 +1970,7 @@ function TabLeadTechnical(t, role) {
 
       <div class="card">
         <div class="sec-title">Phase 2: Technical Review</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">âš™</div><div class="empty-title">Pending Technical Report</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">Pending Technical Report</div></div>` : `
         <div class="grid g2">
             ${inputGroup('r_sp','Service Provider',r.service_provider)}
             ${inputGroup('r_sdate','Survey Date',r.survey_date)}
@@ -1962,8 +1988,8 @@ function TabLeadTechnical(t, role) {
         </div>
         <div style="margin-top:16px">
             <div style="font-weight:600;margin-bottom:8px">Uploaded Reports:</div>
-            ${r.feasibility_doc_url ? `<a href="${r.feasibility_doc_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Feasibility Doc</a>` : ''}
-            ${r.site_survey_doc_url ? `<a href="${r.site_survey_doc_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Site Survey Doc</a>` : ''}
+            ${r.feasibility_doc_url ? `<a href="${r.feasibility_doc_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Feasibility Doc</a>` : ''}
+            ${r.site_survey_doc_url ? `<a href="${r.site_survey_doc_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Site Survey Doc</a>` : ''}
         </div>
         `}
       </div>
@@ -1977,7 +2003,7 @@ function TabLeadAward(t, role) {
     return `
       <div class="card">
         <div class="sec-title">Phase 3: Award / Qualification</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">âš–</div><div class="empty-title">Pending Award Decision</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">⚖</div><div class="empty-title">Pending Award Decision</div></div>` : `
         <div class="grid g2">
             ${inputGroup('p3_res','Qualification Result',r.qualification_result)}
             ${inputGroup('p3_qval','Quoted Bid Value',r.quoted_bid_value)}
@@ -2000,7 +2026,7 @@ function TabLeadDelivery(t, role) {
     return `
       <div class="card">
         <div class="sec-title">Phase 4: Technical Delivery</div>
-        ${!r.id ? `<div class="empty"><div class="empty-icon">ðŸšš</div><div class="empty-title">Pending Delivery</div></div>` : `
+        ${!r.id ? `<div class="empty"><div class="empty-icon">🚚</div><div class="empty-title">Pending Delivery</div></div>` : `
         <div class="grid g2">
             ${inputGroup('p4_ad','Actual Delivery Date',r.delivery_date)}
             ${inputGroup('p4_rem','Delivery Notes',r.delivery_notes,'textarea')}
@@ -2039,8 +2065,8 @@ function TabLeadDelivery(t, role) {
         ` : ''}
         <div style="margin-top:16px">
             <div style="font-weight:600;margin-bottom:8px">Documents:</div>
-            ${r.acceptance_form_url ? `<a href="${r.acceptance_form_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Acceptance Form</a>` : ''}
-            ${r.completion_cert_url ? `<a href="${r.completion_cert_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Completion Certificate</a>` : ''}
+            ${r.acceptance_form_url ? `<a href="${r.acceptance_form_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Acceptance Form</a>` : ''}
+            ${r.completion_cert_url ? `<a href="${r.completion_cert_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Completion Certificate</a>` : ''}
         </div>
         `}
       </div>
@@ -2055,7 +2081,7 @@ function TabLeadBilling(t, role) {
     const cycs = t.payment_cycles||[];
     
     const headHtml = !inv.id ? 
-      (edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary" data-modal="ph5-invoice">Create Invoice Header</button>` : `<div class="empty"><div class="empty-icon">â‚¹</div><div class="empty-title">Pending Invoice Creation</div></div>`) :
+      (edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary" data-modal="ph5-invoice">Create Invoice Header</button>` : `<div class="empty"><div class="empty-icon">₹</div><div class="empty-title">Pending Invoice Creation</div></div>`) :
       `<div class="grid g3">
           ${inputGroup('i_no','Invoice Number',inv.invoice_number)}
           ${inputGroup('i_nt','Notif to Lead Date',inv.notif_to_lead_date)}
@@ -2069,7 +2095,7 @@ function TabLeadBilling(t, role) {
           ${inputGroup('i_dt','Duration To',inv.duration_to)}
           ${inputGroup('i_pc','Payment Cycle',inv.payment_cycle)}
       </div>
-      ${inv.invoice_upload_url ? `<div style="margin-top:12px"><a href="${inv.invoice_upload_url}" target="_blank" class="btn btn-ghost btn-sm">ðŸ“„ View Invoice Document</a></div>` : ''}
+      ${inv.invoice_upload_url ? `<div style="margin-top:12px"><a href="${inv.invoice_upload_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Invoice Document</a></div>` : ''}
       `;
       
     let totalDue = cycs.reduce((a,c)=>a+parseFloat(c.amount_due||0),0);
@@ -2082,9 +2108,9 @@ function TabLeadBilling(t, role) {
          ${edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary btn-sm" data-modal="ph5-cycle">+ Add Cycle</button>` : ''}
       </div>
       <div style="background:var(--bg2);padding:12px;border-radius:6px;display:flex;gap:24px;margin-bottom:16px;font-weight:600">
-         <div>Total Due: <span style="color:var(--text1)">â‚¹${totalDue.toLocaleString('en-IN')}</span></div>
-         <div>Total Received: <span style="color:var(--green)">â‚¹${totalRec.toLocaleString('en-IN')}</span></div>
-         <div>Balance: <span style="color:var(--red)">â‚¹${bal.toLocaleString('en-IN')}</span></div>
+         <div>Total Due: <span style="color:var(--text1)">₹${totalDue.toLocaleString('en-IN')}</span></div>
+         <div>Total Received: <span style="color:var(--green)">₹${totalRec.toLocaleString('en-IN')}</span></div>
+         <div>Balance: <span style="color:var(--red)">₹${bal.toLocaleString('en-IN')}</span></div>
       </div>
       <div class="table-wrap"><table>
          <thead><tr><th>Cycle</th><th>Period</th><th>Due</th><th>Status</th><th>Received</th><th>Pay Date</th>${edit?'<th>Act</th>':''}</tr></thead>
@@ -2151,7 +2177,7 @@ function attachModalHandlers() {
     } catch(e) { toast(e.message,'error'); }
   });
 
-  // Phase Transitions (modal buttons below â€” page-level ones are in attachAll)
+  // Phase Transitions (modal buttons below — page-level ones are in attachAll)
 
   $('ph2SubmitBtn')?.addEventListener('click', async()=>{
      const fd = new FormData();
@@ -2336,8 +2362,8 @@ function openModal(id) {
       <div class="grid g2">
          ${inputGroup('m3_res','Result',r.qualification_result || 'Awarded','select',true,['Awarded','Disqualified','Qualified'])}
          ${inputGroup('m3_ra','Reverse Auction',r.reverse_auction || 'No','select',true,['Yes','No'])}
-         ${inputGroup('m3_qval','Quoted Bid Value (â‚¹)',r.quoted_bid_value || '','number',true)}
-         ${inputGroup('m3_rap','Final Price After RA (â‚¹)',r.final_price_after_ra || '','number',true)}
+         ${inputGroup('m3_qval','Quoted Bid Value (₹)',r.quoted_bid_value || '','number',true)}
+         ${inputGroup('m3_rap','Final Price After RA (₹)',r.final_price_after_ra || '','number',true)}
       </div>
       <div id="m3_awarded_fields" style="margin-top:12px; display: ${(r.qualification_result || 'Awarded') === 'Awarded' ? 'block' : 'none'}" class="grid g2">
          ${inputGroup('m3_ad','Award Date',r.award_date || '','date',true)}
@@ -2777,7 +2803,7 @@ function attachAll() {
   // Phase 1: Submit to Technical button (lives on main page)
   $('btnSubmitPh1Tender')?.addEventListener('click', async () => {
     if (confirm('Submit tender to Technical team? This will lock Phase 1 for editing.')) {
-      try { await api('POST', `/tenders/${S.tenderId}/move`, { stage: 'ph2_active' }); await loadAll(); await loadTender(S.tenderId); render(); toast('Moved to Phase 2 â€” Technical', 'success'); } catch (e) { toast(e.message, 'error'); }
+      try { await api('POST', `/tenders/${S.tenderId}/move`, { stage: 'ph2_active' }); await loadAll(); await loadTender(S.tenderId); render(); toast('Moved to Phase 2 — Technical', 'success'); } catch (e) { toast(e.message, 'error'); }
     }
   });
 }
