@@ -1455,7 +1455,7 @@ function PageAdmin() {
           <tbody>
             ${S.audit.map(a => `
               <tr>
-                <td><div class="table-subtext">${fmtDate(a.created_at)}</div></td>
+                <td><div class="table-subtext">${fmt(a.created_at, 'date')}</div></td>
                 <td>${esc(a.user_name||'')}</td>
                 <td>${esc(a.action)}</td>
                 <td>${esc(a.entity_type)}</td>
