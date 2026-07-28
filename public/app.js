@@ -1897,7 +1897,9 @@ function TabProcurement(t, role) {
 }
 
 function TabProject(t, tab, role) { 
-  const edit = ['admin', 'mgmt', 'tech', 'tender', 'lead'].includes(role);
+  let edit = ['admin', 'mgmt', 'tech', 'tender', 'lead'].includes(role);
+  if (role === 'tech' && (tab === 'project_details' || tab === 'project_technical')) edit = false;
+  if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph2_active') && (tab === 'project_details' || tab === 'project_technical')) edit = false;
   if (tab === 'project_details') {
   const d = t.data || {};
   const items = d.items || [];
