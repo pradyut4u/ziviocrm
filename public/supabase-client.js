@@ -54,7 +54,10 @@ async function api(method, path, body) {
   if (path === '/tenders' || path === '/leads') {
     const table = path === '/tenders' ? 'tenders' : 'leads';
     if (method === 'GET') {
-      const { data } = await supabase.from(table).select('*'); return data;
+      let query = supabase.from(table).select('*');
+      if (S.workspaceId) query = query.eq('workspace_id', S.workspaceId);
+      const { data } = await query;
+      return data;
     }
     if (method === 'POST') {
       const { data } = await supabase.from(table).insert({...body, created_by: S.user.id}).select();
