@@ -864,13 +864,18 @@ function Header() {
 }
 
 // ---- Pipeline ----
-function Pipeline(stage) {
-  const STEPS = [
+function Pipeline(stage, cat) {
+  const isOrder = cat === 'order';
+  let STEPS = [
     {l:'Ph1: Tender',stages:['ph1_draft','ph1_complete']},
     {l:'Ph2: Technical',stages:['ph2_active','ph2_complete']},
     {l:'Ph3: Award',stages:['ph3_active','ph3_awarded','ph3_disqualified']},
     {l:'Ph4: Delivery',stages:['ph4_active','ph4_complete']},
     {l:'Ph5: Billing',stages:['ph5_active','closed']}
+  ];
+  if (isOrder) STEPS = [
+    {l:'Draft', stages:['ph1_draft']},
+    {l:'Ph5: Billing', stages:['ph5_active','closed']}
   ];
   const ci = STAGES.indexOf(stage);
   let html = '<div class="pipeline">';
@@ -1699,7 +1704,11 @@ function PageDetail() {
 
 function detailTabs(t, role) {
   const cat = t.data?.category;
-  if (cat === 'order') return [{k:'order_details',l:'Order Details'}];
+  if (cat === 'order') {
+    const tabs = [{k:'order_details',l:'Order Details'}];
+    if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
+    return tabs;
+  }
   if (cat === 'procurement') return [{k:'procurement_details',l:'Procurement Details'}];
   if (cat === 'project') return [{k:'project_details',l:'Project Plan'}, {k:'project_tasks',l:'Tasks & Milestones'}, {k:'project_installation',l:'Installation'}];
   
@@ -1720,6 +1729,8 @@ function ActionBtns(t, role) {
   const btns = [];
   if (role === 'admin') btns.push(`<button class="btn btn-ghost btn-sm" data-modal="override-stage">Override Stage</button>`);
   
+  if (t.data?.category === 'order') return btns.join('');
+
   if (role === 'tender' || role === 'admin') {
      if (t.stage === 'ph1_draft') btns.push(`<button class="btn btn-primary btn-sm" id="btnSubmitPh1Tender">Submit to Technical (Ph2)</button>`);
      if (t.stage === 'ph3_active') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph3-award">Declare Award / Disqualify / Qualified</button>`);
@@ -1732,7 +1743,7 @@ function ActionBtns(t, role) {
 }
 
 function renderTab(t, tab, role) {
-    if (tab === 'order_details') return TabOrder(t, role);
+    if (tab === 'order_details') return TabOrderDetails(t, role, false);
     if (tab === 'procurement_details') return TabProcurement(t, role);
     if (tab.startsWith('project_')) return TabProject(t, tab, role);
 
@@ -1746,19 +1757,114 @@ function renderTab(t, tab, role) {
     }
 }
 
-function TabOrder(t, role) { 
+function TabOrderDetails(t, role, isLead) {
   const edit = (role === 'admin' || role === 'mgmt');
+  const d = t.data || {};
+  const items = d.items || [];
+  const customCols = d.custom_columns || [];
+  
+  const baseCols = ['Product Name', 'Qty', 'Price (₹)', 'GST %', 'Amount (₹)', 'Link', 'Description', 'Source of Purchase'];
+  const allCols = [...baseCols, ...customCols];
+  
+  let totalAmt = 0;
+  
+  const trs = items.map((item, idx) => {
+     let amount = 0;
+     const qty = parseFloat(item['Qty']) || 0;
+     const price = parseFloat(item['Price (₹)']) || 0;
+     const gst = parseFloat(item['GST %']) || 0;
+     amount = qty * price * (1 + (gst/100));
+     totalAmt += amount;
+     
+     const tds = allCols.map(c => {
+       if (c === 'Amount (₹)') {
+         return `<td><div class="kbd-val" style="padding:4px 8px;font-size:12px;background:#f9fafb;border-radius:4px;">₹${amount.toFixed(2)}</div></td>`;
+       }
+       return `<td><input type="text" class="form-input tbl-input" style="font-size:12px;padding:4px;" data-row="${idx}" data-col="${esc(c)}" value="${esc(item[c]||'')}"></td>`;
+     }).join('');
+     
+     return `<tr>${tds}<td style="width:40px"><button class="btn btn-ghost btn-sm text-red del-row-btn" data-row="${idx}">×</button></td></tr>`;
+  }).join('');
+  
+  let docsHtml = '';
+  const docs = t.documents || [];
+  if (docs.length) {
+    docsHtml = '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">' + docs.map(d => `
+      <div class="file-item">
+        <div class="file-icon">${fileIcon(d.mime)}</div>
+        <div class="file-details">
+          <div class="file-name"><a href="${d.url}" target="_blank">${esc(d.name)}</a></div>
+          <div class="file-meta">${fmt(d.size,'size')} • ${fmt(d.created_at,'date')}</div>
+        </div>
+        <button class="btn btn-ghost text-red del-doc-btn" data-id="${d.id}">Delete</button>
+      </div>
+    `).join('') + '</div>';
+  } else {
+    docsHtml = '<div class="empty" style="padding:16px"><div class="empty-icon">📁</div><div class="empty-title">No documents uploaded</div></div>';
+  }
+
   return `<div class="card">
-    <h3 style="margin-bottom:16px">Order Details</h3>
-    <div class="form-grid">
-      ${inputGroup('ord_po','Customer PO Number',t.ord_po,'text',edit)}
-      ${inputGroup('ord_gem','GeM Contract',t.ord_gem,'text',edit)}
-      ${inputGroup('ord_so','Sales Order ID',t.ord_so,'text',edit)}
-      ${inputGroup('ord_svo','Service Order ID',t.ord_svo,'text',edit)}
-      ${inputGroup('ord_cr','Change Requests',t.ord_cr,'text',edit)}
-      ${inputGroup('ord_close','Order Closure Status',t.ord_close,'select',edit,['Pending','Closed'])}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3>Order Details</h3>
+      <button class="btn btn-primary btn-sm" id="btnSaveOrderHeader">Save Header</button>
     </div>
-  </div>`; 
+    <div class="form-grid">
+      ${!isLead ? inputGroup('ord_num','Order Number',d.order_number,'text',edit) : ''}
+      ${inputGroup('ord_cust','Customer Name',d.customer_name || t.org_name,'text',edit)}
+      ${inputGroup('ord_addr','Delivery Address',d.delivery_address,'textarea',edit)}
+    </div>
+  </div>
+  
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <h3>Items</h3>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" id="btnAddOrderCol">+ Add Column</button>
+        <button class="btn btn-outline btn-sm" id="btnAddOrderRow">+ Add Row</button>
+        <button class="btn btn-primary btn-sm" id="btnSaveOrderItems">Save Items</button>
+        <button class="btn btn-primary btn-sm" id="btnExportOrderExcel" style="background:#10b981;border-color:#10b981">Export to Excel</button>
+      </div>
+    </div>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table style="min-width:800px;font-size:12px">
+        <thead>
+          <tr>
+            ${allCols.map(c => `<th style="white-space:nowrap">${esc(c)}</th>`).join('')}
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${trs}</tbody>
+        ${items.length ? `<tfoot><tr>
+           <td colspan="${allCols.indexOf('Amount (₹)')}" style="text-align:right;font-weight:700">Total:</td>
+           <td style="font-weight:700">₹${totalAmt.toFixed(2)}</td>
+           <td colspan="${allCols.length - allCols.indexOf('Amount (₹)')}"></td>
+        </tr></tfoot>` : ''}
+      </table>
+      ${!items.length ? '<div class="empty" style="padding:20px"><div class="empty-title">No items added</div></div>' : ''}
+    </div>
+  </div>
+  
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3>Documents</h3>
+      <div style="display:flex;gap:8px;">
+         <input type="file" id="orderDocsInput" multiple style="display:none">
+         <button class="btn btn-outline btn-sm" onclick="document.getElementById('orderDocsInput').click()">+ Upload Files</button>
+      </div>
+    </div>
+    ${docsHtml}
+  </div>
+  
+  ${(role === 'admin' && t.stage !== 'ph5_active' && t.stage !== 'closed') ? `<div class="card" style="border: 1px solid var(--border); background: #f8fafc;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h3 style="margin-bottom:4px">Finalise Order</h3>
+        <div style="color:var(--text2);font-size:13px;">Skip to Phase 5 (Billing & Accounts)</div>
+      </div>
+      <button class="btn btn-primary" id="btnFinaliseOrder" style="background:var(--primary);font-size:14px;padding:8px 16px;">Finalise Order →</button>
+    </div>
+  </div>` : ''}
+  `;
 }
 
 function TabProcurement(t, role) { 
@@ -2136,6 +2242,11 @@ function leadTabs(t, role) {
   const cat = t.data?.category;
   if (cat === 'support') return [{k:'support_ticket',l:'Ticket Details'}, {k:'support_rca',l:'RCA & Notes'}];
   if (cat === 'inventory') return [{k:'inventory_stock',l:'Stock Details'}, {k:'inventory_movement',l:'Inward/Outward'}];
+  if (cat === 'order') {
+    const tabs = [{k:'order_details',l:'Order Details'}];
+    if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
+    return tabs;
+  }
 
   const ALL = STAGES;
   const si = ALL.indexOf(t.stage);
@@ -2154,6 +2265,8 @@ function LeadActionBtns(t, role) {
   const btns = [];
   if (role === 'admin') btns.push(`<button class="btn btn-ghost btn-sm" data-modal="override-stage">Override Stage</button>`);
   
+  if (t.data?.category === 'order') return btns.join('');
+
   if (role === 'lead' || role === 'admin') {
      if (t.stage === 'ph1_draft') btns.push(`<button class="btn btn-primary btn-sm" id="btnSubmitPh1Lead">Submit to Technical (Ph2)</button>`);
      if (t.stage === 'ph3_active') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph3-award">Declare Award / Disqualify</button>`);
@@ -2166,6 +2279,7 @@ function LeadActionBtns(t, role) {
 }
 
 function renderLeadTab(t, tab, role) {
+    if (tab === 'order_details') return TabOrderDetails(t, role, true);
     if (tab.startsWith('support_')) return TabSupport(t, tab, role);
     if (tab.startsWith('inventory_')) return TabInventory(t, tab, role);
 
@@ -2653,10 +2767,11 @@ function openModal(id) {
     
     showModal(MW(title, `
       <input type="hidden" id="ntCat" value="${cat}">
-      <input type="hidden" id="ntIsLead" value="${isLeadCat ? 'true' : 'false'}">
-      <div class="form-group"><label class="form-label">${isLeadCat ? 'Title / Subject' : 'Reference / Bid Number'} *</label><input type="text" id="ntBid" class="form-input"></div>
+      ${cat === 'order' ? '<div class="form-group" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="ntIsLead" value="true"> <label for="ntIsLead" class="form-label" style="margin:0;cursor:pointer">Store as Lead (direct sales order)</label></div>' : '<input type="hidden" id="ntIsLead" value="'+(isLeadCat ? 'true' : 'false')+'">'}
+      <div class="form-group"><label class="form-label">${isLeadCat || cat === 'order' ? 'Reference / Order Number' : 'Reference / Bid Number'} *</label><input type="text" id="ntBid" class="form-input"></div>
       <div class="form-group"><label class="form-label">Description / Name</label><input type="text" id="ntTitle" class="form-input"></div>
-      <div class="form-group"><label class="form-label">Organisation / Customer Name</label><input type="text" id="ntOrg" class="form-input"></div>
+      <div class="form-group"><label class="form-label">Customer / Organisation Name</label><input type="text" id="ntOrg" class="form-input"></div>
+      ${cat === 'order' ? '<div class="form-group"><label class="form-label">Delivery Address</label><textarea id="ntAddress" class="form-input" rows="2"></textarea></div>' : ''}
     `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="saveNewTenderBtn">Create</button>`));
   }
 
