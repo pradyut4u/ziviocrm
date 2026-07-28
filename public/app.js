@@ -1710,11 +1710,22 @@ function detailTabs(t, role) {
     return tabs;
   }
   if (cat === 'procurement') return [{k:'procurement_details',l:'Procurement Details'}];
-  if (cat === 'project') return [{k:'project_details',l:'Project Plan'}, {k:'project_tasks',l:'Tasks & Milestones'}, {k:'project_installation',l:'Installation'}];
   
   const ALL = STAGES;
   const si = ALL.indexOf(t.stage);
   const tabs = [];
+  
+  if (cat === 'project') {
+    if (role === 'tender' || role === 'admin' || role === 'mgmt' || role === 'lead') {
+        tabs.push({k:'project_details',l:'Phase 1: Project Details'});
+    }
+    if (si >= ALL.indexOf('ph2_active')) tabs.push({k:'technical',l:'Phase 2: Technical'});
+    if (role !== 'tech' && si >= ALL.indexOf('ph3_active')) tabs.push({k:'project_installation',l:'Phase 3: Installation'});
+    if (si >= ALL.indexOf('ph4_active')) tabs.push({k:'delivery',l:'Phase 4: Delivery'});
+    if (si >= ALL.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
+    return tabs;
+  }
+
   if (role === 'tender' || role === 'admin') {
       tabs.push({k:'tender_info',l:'Phase 1: Tender'});
   }
@@ -1933,16 +1944,17 @@ function TabProject(t, tab, role) {
     docsHtml = '<div class="empty" style="padding:16px"><div class="empty-icon">📁</div><div class="empty-title">No documents uploaded</div></div>';
   }
 
+    const isLead = window.S?.page === 'leads' || !!window.S?.leadId;
+
     return `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h3>Project Plan & Overview</h3>
-        ${edit ? `<button class="btn btn-primary btn-sm" id="btnSaveProjectHeader">Save Header</button>` : ''}
+        ${edit ? `<button class="btn btn-primary btn-sm" id="btnSaveOrderHeader">Save Header</button>` : ''}
       </div>
       <div class="form-grid">
-        ${inputGroup('prj_pm','Project Manager',t.prj_pm,'text',edit)}
-        ${inputGroup('prj_plan','Project Plan',t.prj_plan,'text',edit)}
-        ${inputGroup('prj_mat','Material Allocation',t.prj_mat,'text',edit)}
-        ${inputGroup('prj_res','Resource Roster',t.prj_res,'text',edit)}
+        ${!isLead ? inputGroup('ord_num','Project Number',d.project_number || d.order_number || t.requirements?.order_number,'text',edit) : ''}
+        ${inputGroup('ord_cust','Customer Name',d.customer_name || t.org_name,'text',edit)}
+        ${inputGroup('ord_addr','Delivery Address',d.delivery_address,'textarea',edit)}
       </div>
     </div>
     
@@ -1989,27 +2001,21 @@ function TabProject(t, tab, role) {
   </div>
     `;
   }
-  if (tab === 'project_tasks') {
+  if (tab === 'project_installation') {
     return `<div class="card">
-      <h3 style="margin-bottom:16px">Tasks, Milestones & Events</h3>
-      <div class="form-grid">
-        ${inputGroup('prj_tasks','Tasks & Milestones',t.prj_tasks,'textarea',edit)}
-        ${inputGroup('prj_ecal','Event Calendar',t.prj_ecal,'text',edit)}
-        ${inputGroup('prj_enet','Event Network Plan',t.prj_enet,'text',edit)}
-        ${inputGroup('prj_inc','Incident Log',t.prj_inc,'textarea',edit)}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3>Installation & Closure</h3>
+        ${edit ? `<button class="btn btn-primary btn-sm" id="btnSaveProjectInst">Save Installation</button>` : ''}
       </div>
-    </div>`;
+      <div class="form-grid">
+        ${inputGroup('prj_inst','Installation Status',t.prj_inst,'select',edit,['Pending','In Progress','Completed'])}
+        ${inputGroup('prj_uat','Testing and UAT',t.prj_uat,'select',edit,['Pending','Passed','Failed'])}
+        ${inputGroup('prj_live','Live Monitoring',t.prj_live,'text',edit)}
+        ${inputGroup('prj_dism','Dismantling',t.prj_dism,'select',edit,['N/A','Pending','Done'])}
+        ${inputGroup('prj_close','Handover & Closure',t.prj_close,'select',edit,['Pending','Closed'])}
+      </div>
+    </div>`; 
   }
-  return `<div class="card">
-    <h3 style="margin-bottom:16px">Installation & Closure</h3>
-    <div class="form-grid">
-      ${inputGroup('prj_inst','Installation Status',t.prj_inst,'select',edit,['Pending','In Progress','Completed'])}
-      ${inputGroup('prj_uat','Testing and UAT',t.prj_uat,'select',edit,['Pending','Passed','Failed'])}
-      ${inputGroup('prj_live','Live Monitoring',t.prj_live,'text',edit)}
-      ${inputGroup('prj_dism','Dismantling',t.prj_dism,'select',edit,['N/A','Pending','Done'])}
-      ${inputGroup('prj_close','Handover & Closure',t.prj_close,'select',edit,['Pending','Closed'])}
-    </div>
-  </div>`; 
 }
 
 function inputGroup(id, label, value, type='text', edit=false, options=[]) {
@@ -2342,6 +2348,15 @@ function leadTabs(t, role) {
     if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
     return tabs;
   }
+  
+  if (cat === 'project') {
+    const tabs = [{k:'project_details',l:'Phase 1: Project Details'}];
+    if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph2_active')) tabs.push({k:'technical',l:'Phase 2: Technical'});
+    if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph3_active')) tabs.push({k:'project_installation',l:'Phase 3: Installation'});
+    if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph4_active')) tabs.push({k:'delivery',l:'Phase 4: Delivery'});
+    if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
+    return tabs;
+  }
 
   const ALL = STAGES;
   const si = ALL.indexOf(t.stage);
@@ -2375,6 +2390,7 @@ function LeadActionBtns(t, role) {
 
 function renderLeadTab(t, tab, role) {
     if (tab === 'order_details') return TabOrderDetails(t, role, true);
+    if (tab.startsWith('project_')) return TabProject(t, tab, role);
     if (tab.startsWith('support_')) return TabSupport(t, tab, role);
     if (tab.startsWith('inventory_')) return TabInventory(t, tab, role);
 
@@ -2862,11 +2878,11 @@ function openModal(id) {
     
     showModal(MW(title, `
       <input type="hidden" id="ntCat" value="${cat}">
-      ${cat === 'order' ? '<div class="form-group" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="ntIsLead" value="true"> <label for="ntIsLead" class="form-label" style="margin:0;cursor:pointer">Store as Lead (direct sales order)</label></div>' : '<input type="hidden" id="ntIsLead" value="'+(isLeadCat ? 'true' : 'false')+'">'}
-      <div class="form-group"><label class="form-label">${isLeadCat || cat === 'order' ? 'Reference / Order Number' : 'Reference / Bid Number'} *</label><input type="text" id="ntBid" class="form-input"></div>
+      ${['order','project'].includes(cat) ? '<div class="form-group" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="ntIsLead" value="true"> <label for="ntIsLead" class="form-label" style="margin:0;cursor:pointer">Store as Lead (direct/internal)</label></div>' : '<input type="hidden" id="ntIsLead" value="'+(isLeadCat ? 'true' : 'false')+'">'}
+      <div class="form-group"><label class="form-label">${isLeadCat || ['order','project'].includes(cat) ? 'Reference / Order Number' : 'Reference / Bid Number'} *</label><input type="text" id="ntBid" class="form-input"></div>
       <div class="form-group"><label class="form-label">Description / Name</label><input type="text" id="ntTitle" class="form-input"></div>
       <div class="form-group"><label class="form-label">Customer / Organisation Name</label><input type="text" id="ntOrg" class="form-input"></div>
-      ${cat === 'order' ? '<div class="form-group"><label class="form-label">Delivery Address</label><textarea id="ntAddress" class="form-input" rows="2"></textarea></div>' : ''}
+      ${['order','project'].includes(cat) ? '<div class="form-group"><label class="form-label">Delivery Address</label><textarea id="ntAddress" class="form-input" rows="2"></textarea></div>' : ''}
     `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="saveNewTenderBtn">Create</button>`));
   }
 
@@ -3374,14 +3390,16 @@ function attachAll() {
   });
 
   // --- Order Flow Event Handlers ---
-  $('btnSaveProjectHeader')?.addEventListener('click', async () => {
+  // --- Order Flow Event Handlers ---
+  $('btnSaveProjectInst')?.addEventListener('click', async () => {
     const isLead = S.page === 'lead' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
     const b = {
-      prj_pm: $('prj_pm')?.value,
-      prj_plan: $('prj_plan')?.value,
-      prj_mat: $('prj_mat')?.value,
-      prj_res: $('prj_res')?.value
+      prj_inst: $('prj_inst')?.value,
+      prj_uat: $('prj_uat')?.value,
+      prj_live: $('prj_live')?.value,
+      prj_dism: $('prj_dism')?.value,
+      prj_close: $('prj_close')?.value
     };
     try {
       if (isLead) {
@@ -3391,7 +3409,7 @@ function attachAll() {
         await api('PATCH', `/tenders/${it.id}`, b);
         await loadTender(it.id);
       }
-      render(); toast('Project Header Saved!','success');
+      render(); toast('Installation Saved!','success');
     } catch(e) { toast(e.message,'error'); }
   });
 
