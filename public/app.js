@@ -2070,7 +2070,7 @@ function TabTenderInfo(t, role) {
           ${inputGroup('est_bid_value','Estimated Bid Value (₹)',t.est_bid_value,'number',edit)}
           ${inputGroup('payment_terms','Payment Terms',t.payment_terms,'text',edit)}
           ${inputGroup('service_type','Type of Service',t.service_type,'select',edit,['','ILL','MPLS','BroadBand','P2P','NLD'])}
-          ${inputGroup('bandwidth_mbps','Bandwidth (Mbps)',t.bandwidth_mbps,'number',edit)}
+          ${inputGroup('bandwidth_mbps','Bandwidth (Mbps)',t.bandwidth_mbps,'text',edit)}
           ${inputGroup('ddos_with_ill','DDOS with ILL',t.ddos_with_ill,'select',edit,['','Yes','No','Optional'])}
           ${inputGroup('media_type','Type of Media',t.media_type,'select',edit,['','Fiber','Radio','Copper'])}
           ${inputGroup('static_ip_required','Static IP Required',t.static_ip_required,'select',edit,['','Yes','No'])}
@@ -2485,7 +2485,7 @@ function TabLeadInfo(t, role) {
           ${inputGroup('contract_period','Contract Period',t.contract_period,'text',edit)}
           ${inputGroup('payment_terms','Payment Terms',t.payment_terms,'text',edit)}
           ${inputGroup('service_type','Type of Service',t.service_type,'select',edit,['','ILL','MPLS','Broadband','P2P','NLD'])}
-          ${inputGroup('bandwidth_mbps','Bandwidth (Mbps)',t.bandwidth_mbps,'number',edit)}
+          ${inputGroup('bandwidth_mbps','Bandwidth (Mbps)',t.bandwidth_mbps,'text',edit)}
           ${inputGroup('ddos_with_ill','DDOS with ILL',t.ddos_with_ill,'select',edit,['','Yes','No','Optional'])}
           ${inputGroup('media_type','Type of Media',t.media_type,'select',edit,['','Fiber','Radio','Copper'])}
           ${inputGroup('static_ip_required','Static IP Required',t.static_ip_required,'select',edit,['','Yes','No'])}
