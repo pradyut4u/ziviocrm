@@ -1721,7 +1721,6 @@ function detailTabs(t, role) {
     }
     if (si >= ALL.indexOf('ph2_active')) tabs.push({k:'project_technical',l:'Phase 2: Technical'});
     if (role !== 'tech' && si >= ALL.indexOf('ph3_active')) tabs.push({k:'project_installation',l:'Phase 3: Installation'});
-    if (si >= ALL.indexOf('ph4_active')) tabs.push({k:'delivery',l:'Phase 4: Delivery'});
     if (si >= ALL.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
     return tabs;
   }
@@ -1744,11 +1743,15 @@ function ActionBtns(t, role) {
 
   if (role === 'tender' || role === 'admin') {
      if (t.stage === 'ph1_draft') btns.push(`<button class="btn btn-primary btn-sm" id="btnSubmitPh1Tender">Submit to Technical (Ph2)</button>`);
-     if (t.stage === 'ph3_active') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph3-award">Declare Award / Disqualify / Qualified</button>`);
+     if (t.stage === 'ph3_active' && t.data?.category !== 'project') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph3-award">Declare Award / Disqualify / Qualified</button>`);
   }
   if (role === 'tech' || role === 'admin') {
      if (t.stage === 'ph2_active') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph2-report">Submit Technical Report</button>`);
      if (t.stage === 'ph4_active') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph4-deliver">Mark Delivered (Ph4)</button>`);
+  }
+  
+  if (t.data?.category === 'project' && t.stage === 'ph3_active' && ['admin', 'tech', 'tender', 'lead'].includes(role)) {
+      btns.push(`<button class="btn btn-primary btn-sm" id="btnSubmitProjectPh3">Submit to Billing (Ph5)</button>`);
   }
   return btns.join('');
 }
@@ -2370,7 +2373,6 @@ function leadTabs(t, role) {
     const tabs = [{k:'project_details',l:'Phase 1: Project Details'}];
     if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph2_active')) tabs.push({k:'project_technical',l:'Phase 2: Technical'});
     if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph3_active')) tabs.push({k:'project_installation',l:'Phase 3: Installation'});
-    if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph4_active')) tabs.push({k:'delivery',l:'Phase 4: Delivery'});
     if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
     return tabs;
   }
@@ -2396,11 +2398,15 @@ function LeadActionBtns(t, role) {
 
   if (role === 'lead' || role === 'admin') {
      if (t.stage === 'ph1_draft') btns.push(`<button class="btn btn-primary btn-sm" id="btnSubmitPh1Lead">Submit to Technical (Ph2)</button>`);
-     if (t.stage === 'ph3_active') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph3-award">Declare Award / Disqualify</button>`);
+     if (t.stage === 'ph3_active' && t.data?.category !== 'project') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph3-award">Declare Award / Disqualify</button>`);
   }
   if (role === 'tech' || role === 'admin') {
      if (t.stage === 'ph2_active') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph2-report">Submit Technical Report</button>`);
      if (t.stage === 'ph4_active') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph4-deliver">Mark Delivered (Ph4)</button>`);
+  }
+  
+  if (t.data?.category === 'project' && t.stage === 'ph3_active' && ['admin', 'tech', 'tender', 'lead'].includes(role)) {
+      btns.push(`<button class="btn btn-primary btn-sm" id="btnSubmitProjectPh3">Submit to Billing (Ph5)</button>`);
   }
   return btns.join('');
 }
@@ -3406,7 +3412,21 @@ function attachAll() {
     }
   });
 
-  // --- Order Flow Event Handlers ---
+  $('btnSubmitProjectPh3')?.addEventListener('click', async () => {
+    if (confirm('Submit project to Billing (skip Phase 4)?')) {
+      try { 
+        const isLead = S.page === 'lead' || !!S.leadId;
+        const it = isLead ? S.leadItem : S.tender;
+        const endpoint = isLead ? `/leads/${it.id}/move` : `/tenders/${it.id}/move`;
+        await api('POST', endpoint, { stage: 'ph5_active' }); 
+        await loadAll(); 
+        if (isLead) await loadLead(it.id); else await loadTender(it.id);
+        render(); 
+        toast('Moved to Phase 5 - Billing', 'success'); 
+      } catch (e) { toast(e.message, 'error'); }
+    }
+  });
+
   // --- Order Flow Event Handlers ---
   $('btnSaveProjectInst')?.addEventListener('click', async () => {
     const isLead = S.page === 'lead' || !!S.leadId;
