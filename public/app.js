@@ -944,7 +944,8 @@ function PageDashboard() {
   `;
 
   const renderLeads = () => {
-    const leads = (S.leads || []).map(l => ({ ...l, _type: 'Lead' })).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    let leads = (S.leads || []).map(l => ({ ...l, _type: 'Lead' })).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    if (role === 'tech') leads = leads.filter(l => l.stage !== 'ph1_draft');
     const isAcipl = (S.workspaces.find(w => w.id === S.workspaceId)?.name || '').toLowerCase() === 'acipl';
     return `
       <div class="card" style="margin-bottom:20px">
@@ -1000,7 +1001,8 @@ function PageDashboard() {
   };
 
   const renderTenders = () => {
-    const tenders = (S.tenders || []).map(t => ({ ...t, _type: 'Tender' })).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    let tenders = (S.tenders || []).map(t => ({ ...t, _type: 'Tender' })).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    if (role === 'tech') tenders = tenders.filter(t => t.stage !== 'ph1_draft');
     const isAcipl = (S.workspaces.find(w => w.id === S.workspaceId)?.name || '').toLowerCase() === 'acipl';
     return `
       <div class="card" style="margin-bottom:20px">
@@ -1274,7 +1276,9 @@ function renderAnalytics() {
 }
 
 function PageTenders() {
-  const role = S.user?.role, list = S.tenders;
+  const role = S.user?.role;
+  let list = S.tenders || [];
+  if (role === 'tech') list = list.filter(t => t.stage !== 'ph1_draft');
   const isAcipl = (S.workspaces.find(w => w.id === S.workspaceId)?.name || '').toLowerCase() === 'acipl';
   return `
     <div class="page-header">
@@ -2302,7 +2306,9 @@ function TabBilling(t, role) {
 
 // ---- LEADS MODULE (Duplicated) ----
 function PageLeads() {
-  const role = S.user?.role, list = S.leads || [];
+  const role = S.user?.role;
+  let list = S.leads || [];
+  if (role === 'tech') list = list.filter(l => l.stage !== 'ph1_draft');
   const isAcipl = (S.workspaces.find(w => w.id === S.workspaceId)?.name || '').toLowerCase() === 'acipl';
   return `
     <div class="page-header">
