@@ -1719,7 +1719,7 @@ function detailTabs(t, role) {
     if (role === 'tender' || role === 'admin' || role === 'mgmt' || role === 'lead') {
         tabs.push({k:'project_details',l:'Phase 1: Project Details'});
     }
-    if (si >= ALL.indexOf('ph2_active')) tabs.push({k:'technical',l:'Phase 2: Technical'});
+    if (si >= ALL.indexOf('ph2_active')) tabs.push({k:'project_technical',l:'Phase 2: Technical'});
     if (role !== 'tech' && si >= ALL.indexOf('ph3_active')) tabs.push({k:'project_installation',l:'Phase 3: Installation'});
     if (si >= ALL.indexOf('ph4_active')) tabs.push({k:'delivery',l:'Phase 4: Delivery'});
     if (si >= ALL.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
@@ -2000,6 +2000,21 @@ function TabProject(t, tab, role) {
     ${docsHtml}
   </div>
     `;
+  }
+  if (tab === 'project_technical') {
+    const d = t.data || {};
+    const isLead = window.S?.page === 'leads' || !!window.S?.leadId;
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3>Project Plan & Overview</h3>
+        ${edit ? `<button class="btn btn-primary btn-sm" id="btnSaveOrderHeader">Save Header</button>` : ''}
+      </div>
+      <div class="form-grid">
+        ${!isLead ? inputGroup('ord_num','Project Number',d.project_number || d.order_number || t.requirements?.order_number,'text',edit) : ''}
+        ${inputGroup('ord_cust','Customer Name',d.customer_name || t.org_name,'text',edit)}
+        ${inputGroup('ord_addr','Delivery Address',d.delivery_address,'textarea',edit)}
+      </div>
+    </div>`;
   }
   if (tab === 'project_installation') {
     return `<div class="card">
@@ -2351,7 +2366,7 @@ function leadTabs(t, role) {
   
   if (cat === 'project') {
     const tabs = [{k:'project_details',l:'Phase 1: Project Details'}];
-    if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph2_active')) tabs.push({k:'technical',l:'Phase 2: Technical'});
+    if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph2_active')) tabs.push({k:'project_technical',l:'Phase 2: Technical'});
     if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph3_active')) tabs.push({k:'project_installation',l:'Phase 3: Installation'});
     if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph4_active')) tabs.push({k:'delivery',l:'Phase 4: Delivery'});
     if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
@@ -3440,12 +3455,21 @@ function attachAll() {
     const isLead = S.page === 'lead' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
     const d = it.data || {};
+    const items = d.items || [];
+    
+    document.querySelectorAll('.tbl-input').forEach(inp => {
+       const rowIdx = parseInt(inp.dataset.row);
+       const cName = inp.dataset.col;
+       if (!items[rowIdx]) items[rowIdx] = {};
+       items[rowIdx][cName] = inp.value;
+    });
+
     const customCols = d.custom_columns || [];
     if (customCols.includes(colName)) return toast('Column exists','error');
     customCols.push(colName);
     try {
       const endpoint = isLead ? `/leads/${it.id}` : `/tenders/${it.id}`;
-      await api('PATCH', endpoint, { data: { ...d, custom_columns: customCols } });
+      await api('PATCH', endpoint, { data: { ...d, items, custom_columns: customCols } });
       isLead ? await loadLead(it.id) : await loadTender(it.id);
       render(); toast('Column added','success');
     } catch(e) { toast(e.message,'error'); }
@@ -3456,6 +3480,14 @@ function attachAll() {
     const it = isLead ? S.leadItem : S.tender;
     const d = it.data || {};
     const items = d.items || [];
+    
+    document.querySelectorAll('.tbl-input').forEach(inp => {
+       const rowIdx = parseInt(inp.dataset.row);
+       const colName = inp.dataset.col;
+       if (!items[rowIdx]) items[rowIdx] = {};
+       items[rowIdx][colName] = inp.value;
+    });
+
     items.push({});
     try {
       const endpoint = isLead ? `/leads/${it.id}` : `/tenders/${it.id}`;
@@ -3471,6 +3503,14 @@ function attachAll() {
       const it = isLead ? S.leadItem : S.tender;
       const d = it.data || {};
       const items = d.items || [];
+      
+      document.querySelectorAll('.tbl-input').forEach(inp => {
+         const rIdx = parseInt(inp.dataset.row);
+         const colName = inp.dataset.col;
+         if (!items[rIdx]) items[rIdx] = {};
+         items[rIdx][colName] = inp.value;
+      });
+
       const rowIdx = parseInt(e.target.dataset.row);
       items.splice(rowIdx, 1);
       try {
