@@ -1003,7 +1003,7 @@ function PageDashboard() {
           <div class="sec-title" style="margin-bottom:0;flex:1">Tenders Overview</div>
           <div style="display:flex;gap:8px;">
             ${['tender','admin'].includes(role) ? '<button class="btn btn-primary btn-sm" id="btnNewTender">+ New Tender</button>' : ''}
-            ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewOrder">+ New Order</button>`:''}
+            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewOrder">+ New Order</button>`:''}
             ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProcurement">+ New Procurement</button>`:''}
             ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProject">+ New Project</button>`:''}
           </div>
@@ -1179,7 +1179,7 @@ function renderAnalytics() {
 
   if (isAcipl) {
     data.quickActions.push(
-      { label: '+ New Order', id: 'btnDashNewOrder', iconKey: 'tender', show: ['admin','mgmt'].includes(role) },
+      { label: '+ New Order', id: 'btnDashNewOrder', iconKey: 'tender', show: ['admin','mgmt','tender','lead'].includes(role) },
       { label: '+ New Procurement', id: 'btnDashNewProcurement', iconKey: 'tender', show: ['admin','mgmt'].includes(role) },
       { label: '+ New Project', id: 'btnDashNewProject', iconKey: 'tender', show: ['admin','mgmt'].includes(role) },
       { label: '+ New Support Ticket', id: 'btnDashNewSupport', iconKey: 'lead', show: ['admin','mgmt','tech'].includes(role) },
@@ -1277,7 +1277,7 @@ function PageTenders() {
       <div class="page-actions" style="display:flex; gap:8px;">
         ${role === 'admin' ? `<button class="btn btn-outline" id="btnExportTenders">Export CSV</button>` : ''}
         ${['tender','admin'].includes(role)?`<button class="btn btn-primary" id="btnNewTenderPage">+ New Tender</button>`:''}
-        ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewOrder">+ New Order</button>`:''}
+        ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" id="btnDashNewOrder">+ New Order</button>`:''}
         ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProcurement">+ New Procurement</button>`:''}
         ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProject">+ New Project</button>`:''}
       </div>
@@ -2086,6 +2086,7 @@ function PageLeads() {
         ${['lead','admin'].includes(role)?`<button class="btn btn-primary" id="btnNewLeadPage">+ New Lead</button>`:''}
         ${isAcipl && ['admin','mgmt','tech'].includes(role)?`<button class="btn btn-primary" id="btnDashNewSupport">+ New Support</button>`:''}
         ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewInventory">+ New Inventory</button>`:''}
+        ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" id="btnDashNewOrder">+ New Order</button>`:''}
       </div>
     </div>
     ${list.length?`
