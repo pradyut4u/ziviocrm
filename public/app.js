@@ -940,12 +940,15 @@ function PageDashboard() {
 
   const renderLeads = () => {
     const leads = (S.leads || []).map(l => ({ ...l, _type: 'Lead' })).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    const isAcipl = (S.workspaces.find(w => w.id === S.workspaceId)?.name || '').toLowerCase() === 'acipl';
     return `
       <div class="card" style="margin-bottom:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
           <div class="sec-title" style="margin-bottom:0;flex:1">Leads Overview</div>
           <div style="display:flex;gap:8px;">
             ${['lead','admin'].includes(role) ? '<button class="btn btn-primary btn-sm" id="btnNewLead">+ New Lead</button>' : ''}
+            ${isAcipl && ['admin','mgmt','tech'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewSupport">+ New Support</button>`:''}
+            ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewInventory">+ New Inventory</button>`:''}
           </div>
         </div>
         ${leads.length ? `
@@ -993,12 +996,16 @@ function PageDashboard() {
 
   const renderTenders = () => {
     const tenders = (S.tenders || []).map(t => ({ ...t, _type: 'Tender' })).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    const isAcipl = (S.workspaces.find(w => w.id === S.workspaceId)?.name || '').toLowerCase() === 'acipl';
     return `
       <div class="card" style="margin-bottom:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
           <div class="sec-title" style="margin-bottom:0;flex:1">Tenders Overview</div>
           <div style="display:flex;gap:8px;">
             ${['tender','admin'].includes(role) ? '<button class="btn btn-primary btn-sm" id="btnNewTender">+ New Tender</button>' : ''}
+            ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewOrder">+ New Order</button>`:''}
+            ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProcurement">+ New Procurement</button>`:''}
+            ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProject">+ New Project</button>`:''}
           </div>
         </div>
         ${tenders.length ? `
@@ -1159,16 +1166,26 @@ function renderAnalytics() {
     },
     revenueByService: [],
     customerDistribution: [],
-    tenderOverview: [],
-    monthlyRevenue: [],
-    opportunitySource: [],
     upcomingDeadlines: [],
-    quickActions: [
-      { label: '+ Add New Lead', id: 'btnDashNewLead', iconKey: 'lead', show: ['lead','admin','mgmt'].includes(role) },
-      { label: '+ Add New Tender', id: 'btnDashNewTender', iconKey: 'tender', show: ['tender','admin','mgmt'].includes(role) }
-    ],
     recentActivity: []
   };
+
+  const isAcipl = (S.workspaces.find(w => w.id === S.workspaceId)?.name || '').toLowerCase() === 'acipl';
+  
+  data.quickActions = [
+    { label: '+ Add New Lead', id: 'btnDashNewLead', iconKey: 'lead', show: ['lead','admin','mgmt'].includes(role) },
+    { label: '+ Add New Tender', id: 'btnDashNewTender', iconKey: 'tender', show: ['tender','admin','mgmt'].includes(role) }
+  ];
+
+  if (isAcipl) {
+    data.quickActions.push(
+      { label: '+ New Order', id: 'btnDashNewOrder', iconKey: 'tender', show: ['admin','mgmt'].includes(role) },
+      { label: '+ New Procurement', id: 'btnDashNewProcurement', iconKey: 'tender', show: ['admin','mgmt'].includes(role) },
+      { label: '+ New Project', id: 'btnDashNewProject', iconKey: 'tender', show: ['admin','mgmt'].includes(role) },
+      { label: '+ New Support Ticket', id: 'btnDashNewSupport', iconKey: 'lead', show: ['admin','mgmt','tech'].includes(role) },
+      { label: '+ New Inventory', id: 'btnDashNewInventory', iconKey: 'lead', show: ['admin','mgmt'].includes(role) }
+    );
+  }
 
   // Revenue by Service Type
   const srvMap = {};
@@ -1253,12 +1270,16 @@ function renderAnalytics() {
 
 function PageTenders() {
   const role = S.user?.role, list = S.tenders;
+  const isAcipl = (S.workspaces.find(w => w.id === S.workspaceId)?.name || '').toLowerCase() === 'acipl';
   return `
     <div class="page-header">
       <div><div class="page-title">Tenders</div><div class="page-sub">${list.length} tenders</div></div>
-      <div class="page-actions">
+      <div class="page-actions" style="display:flex; gap:8px;">
         ${role === 'admin' ? `<button class="btn btn-outline" id="btnExportTenders">Export CSV</button>` : ''}
         ${['tender','admin'].includes(role)?`<button class="btn btn-primary" id="btnNewTenderPage">+ New Tender</button>`:''}
+        ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewOrder">+ New Order</button>`:''}
+        ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProcurement">+ New Procurement</button>`:''}
+        ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProject">+ New Project</button>`:''}
       </div>
     </div>
     ${list.length?`
@@ -1425,11 +1446,12 @@ function PageAdmin() {
         <div style="flex:1">
           <label class="form-label">Role</label>
           <select id="nu-role" class="form-control">
-            <option value="lead_manager">Phase 1 & 3: Lead Manager</option>
-            <option value="tender_manager">Phase 1 & 3: Tender Manager</option>
-            <option value="technical">Phase 2 & 4: Technical</option>
-            <option value="billing">Phase 5: Billing & Accounts</option>
+            <option value="lead">Phase 1 & 3: Lead Manager</option>
+            <option value="tender">Phase 1 & 3: Tender Manager</option>
+            <option value="tech">Phase 2 & 4: Technical</option>
+            <option value="acct">Phase 5: Billing & Accounts</option>
             <option value="admin">Administrator</option>
+            <option value="mgmt">Management</option>
           </select>
         </div>
         <button class="btn btn-primary" onclick="createUser()">Add User</button>
@@ -1676,6 +1698,11 @@ function PageDetail() {
 }
 
 function detailTabs(t, role) {
+  const cat = t.data?.category;
+  if (cat === 'order') return [{k:'order_details',l:'Order Details'}];
+  if (cat === 'procurement') return [{k:'procurement_details',l:'Procurement Details'}];
+  if (cat === 'project') return [{k:'project_details',l:'Project Plan'}, {k:'project_tasks',l:'Tasks & Milestones'}, {k:'project_installation',l:'Installation'}];
+  
   const ALL = STAGES;
   const si = ALL.indexOf(t.stage);
   const tabs = [];
@@ -1705,14 +1732,84 @@ function ActionBtns(t, role) {
 }
 
 function renderTab(t, tab, role) {
-  switch(tab) {
-    case 'tender_info': return TabTenderInfo(t, role);
-    case 'technical': return TabTechnical(t, role);
-    case 'award': return TabAward(t, role);
-    case 'delivery': return TabDelivery(t, role);
-    case 'billing': return TabBilling(t, role);
-    default: return TabTenderInfo(t, role);
+    if (tab === 'order_details') return TabOrder(t, role);
+    if (tab === 'procurement_details') return TabProcurement(t, role);
+    if (tab.startsWith('project_')) return TabProject(t, tab, role);
+
+    switch(tab) {
+      case 'tender_info': return TabTenderInfo(t, role);
+      case 'technical': return TabTechnical(t, role);
+      case 'award': return TabAward(t, role);
+      case 'delivery': return TabDelivery(t, role);
+      case 'billing': return TabBilling(t, role);
+      default: return TabTenderInfo(t, role);
+    }
+}
+
+function TabOrder(t, role) { 
+  const edit = (role === 'admin' || role === 'mgmt');
+  return `<div class="card">
+    <h3 style="margin-bottom:16px">Order Details</h3>
+    <div class="form-grid">
+      ${inputGroup('ord_po','Customer PO Number',t.ord_po,'text',edit)}
+      ${inputGroup('ord_gem','GeM Contract',t.ord_gem,'text',edit)}
+      ${inputGroup('ord_so','Sales Order ID',t.ord_so,'text',edit)}
+      ${inputGroup('ord_svo','Service Order ID',t.ord_svo,'text',edit)}
+      ${inputGroup('ord_cr','Change Requests',t.ord_cr,'text',edit)}
+      ${inputGroup('ord_close','Order Closure Status',t.ord_close,'select',edit,['Pending','Closed'])}
+    </div>
+  </div>`; 
+}
+
+function TabProcurement(t, role) { 
+  const edit = (role === 'admin' || role === 'mgmt');
+  return `<div class="card">
+    <h3 style="margin-bottom:16px">Procurement Form</h3>
+    <div class="form-grid">
+      ${inputGroup('pr_req','Purchase Request #',t.pr_req,'text',edit)}
+      ${inputGroup('pr_rfq','RFQ ID',t.pr_rfq,'text',edit)}
+      ${inputGroup('pr_vq','Vendor Quotation',t.pr_vq,'text',edit)}
+      ${inputGroup('pr_po','Purchase Order',t.pr_po,'text',edit)}
+      ${inputGroup('pr_grn','GRN / Material Tracking',t.pr_grn,'text',edit)}
+      ${inputGroup('pr_bill','Vendor Bill',t.pr_bill,'text',edit)}
+    </div>
+  </div>`; 
+}
+
+function TabProject(t, tab, role) { 
+  const edit = (role === 'admin' || role === 'tech' || role === 'mgmt');
+  if (tab === 'project_details') {
+    return `<div class="card">
+      <h3 style="margin-bottom:16px">Project Plan & Overview</h3>
+      <div class="form-grid">
+        ${inputGroup('prj_pm','Project Manager',t.prj_pm,'text',edit)}
+        ${inputGroup('prj_plan','Project Plan',t.prj_plan,'text',edit)}
+        ${inputGroup('prj_mat','Material Allocation',t.prj_mat,'text',edit)}
+        ${inputGroup('prj_res','Resource Roster',t.prj_res,'text',edit)}
+      </div>
+    </div>`;
   }
+  if (tab === 'project_tasks') {
+    return `<div class="card">
+      <h3 style="margin-bottom:16px">Tasks, Milestones & Events</h3>
+      <div class="form-grid">
+        ${inputGroup('prj_tasks','Tasks & Milestones',t.prj_tasks,'textarea',edit)}
+        ${inputGroup('prj_ecal','Event Calendar',t.prj_ecal,'text',edit)}
+        ${inputGroup('prj_enet','Event Network Plan',t.prj_enet,'text',edit)}
+        ${inputGroup('prj_inc','Incident Log',t.prj_inc,'textarea',edit)}
+      </div>
+    </div>`;
+  }
+  return `<div class="card">
+    <h3 style="margin-bottom:16px">Installation & Closure</h3>
+    <div class="form-grid">
+      ${inputGroup('prj_inst','Installation Status',t.prj_inst,'select',edit,['Pending','In Progress','Completed'])}
+      ${inputGroup('prj_uat','Testing and UAT',t.prj_uat,'select',edit,['Pending','Passed','Failed'])}
+      ${inputGroup('prj_live','Live Monitoring',t.prj_live,'text',edit)}
+      ${inputGroup('prj_dism','Dismantling',t.prj_dism,'select',edit,['N/A','Pending','Done'])}
+      ${inputGroup('prj_close','Handover & Closure',t.prj_close,'select',edit,['Pending','Closed'])}
+    </div>
+  </div>`; 
 }
 
 function inputGroup(id, label, value, type='text', edit=false, options=[]) {
@@ -1770,7 +1867,7 @@ function TabTenderInfo(t, role) {
         </form>
         
         <div class="sec-title" style="margin-top:24px">Tender Documents</div>
-        ${edit ? `<label class="upload-zone" id="docTenderDrop" style="margin-bottom:18px"><div class="uz-icon">â˜</div><div class="uz-title">Upload Documents</div><input type="file" id="docTenderFile" style="display:none"></label>` : ''}
+        ${edit ? `<label class="upload-zone" id="docTenderDrop" style="margin-bottom:18px"><div class="uz-icon">â˜ </div><div class="uz-title">Upload Documents</div><input type="file" id="docTenderFile" style="display:none"></label>` : ''}
         <div class="file-list">${(t.documents||[]).map(d=>`
           <div class="file-item"><div class="file-icon">${fileIcon(d.mime)}</div><div style="flex:1">${esc(d.name)}</div>
           <a href="${d.url}" target="_blank" class="btn btn-ghost btn-sm">View</a></div>`).join('')}
@@ -1980,12 +2077,15 @@ function TabBilling(t, role) {
 // ---- LEADS MODULE (Duplicated) ----
 function PageLeads() {
   const role = S.user?.role, list = S.leads || [];
+  const isAcipl = (S.workspaces.find(w => w.id === S.workspaceId)?.name || '').toLowerCase() === 'acipl';
   return `
     <div class="page-header">
       <div><div class="page-title">Leads</div><div class="page-sub">${list.length} leads</div></div>
-      <div class="page-actions">
+      <div class="page-actions" style="display:flex; gap:8px;">
         ${role === 'admin' ? `<button class="btn btn-outline" id="btnExportLeads">Export CSV</button>` : ''}
         ${['lead','admin'].includes(role)?`<button class="btn btn-primary" id="btnNewLeadPage">+ New Lead</button>`:''}
+        ${isAcipl && ['admin','mgmt','tech'].includes(role)?`<button class="btn btn-primary" id="btnDashNewSupport">+ New Support</button>`:''}
+        ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewInventory">+ New Inventory</button>`:''}
       </div>
     </div>
     ${list.length?`
@@ -2001,7 +2101,7 @@ function PageLeads() {
           </tr>`).join('')}
         </tbody>
       </table></div>`:
-      `<div class="empty"><div class="empty-icon">ðŸ”</div><div class="empty-title">No leads</div></div>`}`;
+      `<div class="empty"><div class="empty-icon">ðŸ” </div><div class="empty-title">No leads</div></div>`}`;
 }
 
 // ---- Technical Page ----
@@ -2032,6 +2132,10 @@ function LeadDetail() {
 }
 
 function leadTabs(t, role) {
+  const cat = t.data?.category;
+  if (cat === 'support') return [{k:'support_ticket',l:'Ticket Details'}, {k:'support_rca',l:'RCA & Notes'}];
+  if (cat === 'inventory') return [{k:'inventory_stock',l:'Stock Details'}, {k:'inventory_movement',l:'Inward/Outward'}];
+
   const ALL = STAGES;
   const si = ALL.indexOf(t.stage);
   const tabs = [];
@@ -2061,14 +2165,62 @@ function LeadActionBtns(t, role) {
 }
 
 function renderLeadTab(t, tab, role) {
-  switch(tab) {
-    case 'lead_info': return TabLeadInfo(t, role);
-    case 'technical': return TabLeadTechnical(t, role);
-    case 'award': return TabLeadAward(t, role);
-    case 'delivery': return TabLeadDelivery(t, role);
-    case 'billing': return TabLeadBilling(t, role);
-    default: return TabLeadInfo(t, role);
+    if (tab.startsWith('support_')) return TabSupport(t, tab, role);
+    if (tab.startsWith('inventory_')) return TabInventory(t, tab, role);
+
+    switch(tab) {
+      case 'lead_info': return TabLeadInfo(t, role);
+      case 'technical': return TabLeadTechnical(t, role);
+      case 'award': return TabLeadAward(t, role);
+      case 'delivery': return TabLeadDelivery(t, role);
+      case 'billing': return TabLeadBilling(t, role);
+      default: return TabLeadInfo(t, role);
+    }
+}
+
+function TabSupport(t, tab, role) { 
+  const edit = true; // All roles can interact with support for now
+  if (tab === 'support_ticket') {
+    return `<div class="card">
+      <h3 style="margin-bottom:16px">Ticket Details</h3>
+      <div class="form-grid">
+        ${inputGroup('sup_status','Ticket Status',t.sup_status,'select',edit,['New','Assigned','In Progress','Customer Pending','Vendor Pending','Escalated','Resolved','Closed'])}
+        ${inputGroup('sup_desc','Issue Description',t.sup_desc,'textarea',edit)}
+        ${inputGroup('sup_sla','SLA Status',t.sup_sla,'select',edit,['Within SLA','SLA Breached'])}
+      </div>
+    </div>`;
   }
+  return `<div class="card">
+    <h3 style="margin-bottom:16px">RCA & Knowledge</h3>
+    <div class="form-grid">
+      ${inputGroup('sup_rca','Root Cause Analysis (RCA)',t.sup_rca,'textarea',edit)}
+      ${inputGroup('sup_kb','Knowledge Base Reference',t.sup_kb,'text',edit)}
+    </div>
+  </div>`;
+}
+
+function TabInventory(t, tab, role) { 
+  const edit = (role === 'admin' || role === 'mgmt');
+  if (tab === 'inventory_stock') {
+    return `<div class="card">
+      <h3 style="margin-bottom:16px">Stock & Inventory</h3>
+      <div class="form-grid">
+        ${inputGroup('inv_stock','Stock Level',t.inv_stock,'number',edit)}
+        ${inputGroup('inv_res','Reservations',t.inv_res,'text',edit)}
+        ${inputGroup('inv_serial','Serialized Assets',t.inv_serial,'textarea',edit)}
+        ${inputGroup('inv_cust','Customer / Rental Assets',t.inv_cust,'text',edit)}
+      </div>
+    </div>`;
+  }
+  return `<div class="card">
+    <h3 style="margin-bottom:16px">Movement & Audit</h3>
+    <div class="form-grid">
+      ${inputGroup('inv_in','Inward',t.inv_in,'text',edit)}
+      ${inputGroup('inv_out','Outward',t.inv_out,'text',edit)}
+      ${inputGroup('inv_rma','Returns / RMA',t.inv_rma,'text',edit)}
+      ${inputGroup('inv_audit','Stock Audit Status',t.inv_audit,'text',edit)}
+    </div>
+  </div>`;
 }
 
 function TabLeadInfo(t, role) {
@@ -2336,10 +2488,17 @@ function attachModalHandlers() {
   // Create new tender modal logic
   $('saveNewTenderBtn')?.addEventListener('click', async () => {
     const bid = $('ntBid')?.value;
-    if (!bid) return toast('Bid Number is required','error');
+    const cat = $('ntCat')?.value || '';
+    const isLead = $('ntIsLead')?.value === 'true';
+    if (!bid) return toast('Reference Number is required','error');
     try {
-      await api('POST','/tenders',{ bid_number: bid, title: $('ntTitle')?.value, org_name: $('ntOrg')?.value, stage: 'ph1_draft' });
-      await loadTenders(); removeModal(); render(); toast('Tender created!','success');
+      if (isLead) {
+        await api('POST','/leads',{ title: bid, org_name: $('ntOrg')?.value, data: { category: cat, description: $('ntTitle')?.value }, stage: 'ph1_draft' });
+        try { S.leads = await api('GET', '/leads') || []; } catch {}
+      } else {
+        await api('POST','/tenders',{ bid_number: bid, title: $('ntTitle')?.value, org_name: $('ntOrg')?.value, data: { category: cat }, stage: 'ph1_draft' });
+      }
+      await loadTenders(); removeModal(); render(); toast('Record created!','success');
     } catch(e) { toast(e.message,'error'); }
   });
 
@@ -2479,11 +2638,24 @@ window.editCycle = (cid) => {
 }
 
 function openModal(id) {
-  if (id === 'create-tender' || id === 'btnNewTender' || id === 'btnNewTenderPage') {
-    showModal(MW('New Tender', `
-      <div class="form-group"><label class="form-label">Bid Number *</label><input type="text" id="ntBid" class="form-input"></div>
-      <div class="form-group"><label class="form-label">Tender Title</label><input type="text" id="ntTitle" class="form-input"></div>
-      <div class="form-group"><label class="form-label">Organisation Name</label><input type="text" id="ntOrg" class="form-input"></div>
+  if (id === 'create-tender' || id === 'btnNewTender' || id === 'btnNewTenderPage' || id.startsWith('create-')) {
+    let title = 'New Tender';
+    let cat = '';
+    if (id === 'create-order') { title = 'New Order'; cat = 'order'; }
+    if (id === 'create-procurement') { title = 'New Procurement Request'; cat = 'procurement'; }
+    if (id === 'create-project') { title = 'New Project/Event'; cat = 'project'; }
+    if (id === 'create-support') { title = 'New Support Ticket'; cat = 'support'; }
+    if (id === 'create-inventory') { title = 'New Inventory Record'; cat = 'inventory'; }
+    
+    // Support and Inventory will be stored in Leads, others in Tenders.
+    const isLeadCat = ['support', 'inventory'].includes(cat);
+    
+    showModal(MW(title, `
+      <input type="hidden" id="ntCat" value="${cat}">
+      <input type="hidden" id="ntIsLead" value="${isLeadCat ? 'true' : 'false'}">
+      <div class="form-group"><label class="form-label">${isLeadCat ? 'Title / Subject' : 'Reference / Bid Number'} *</label><input type="text" id="ntBid" class="form-input"></div>
+      <div class="form-group"><label class="form-label">Description / Name</label><input type="text" id="ntTitle" class="form-input"></div>
+      <div class="form-group"><label class="form-label">Organisation / Customer Name</label><input type="text" id="ntOrg" class="form-input"></div>
     `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="saveNewTenderBtn">Create</button>`));
   }
 
@@ -2899,6 +3071,12 @@ function attachAll() {
   });
   $('btnDashNewTender')?.addEventListener('click', () => openModal('btnNewTenderPage'));
   $('btnDashNewLead')?.addEventListener('click', () => openModal('btnNewLeadPage'));
+
+  $('btnDashNewOrder')?.addEventListener('click', () => openModal('create-order'));
+  $('btnDashNewProcurement')?.addEventListener('click', () => openModal('create-procurement'));
+  $('btnDashNewProject')?.addEventListener('click', () => openModal('create-project'));
+  $('btnDashNewSupport')?.addEventListener('click', () => openModal('create-support'));
+  $('btnDashNewInventory')?.addEventListener('click', () => openModal('create-inventory'));
 
   $('btnNewTender')?.addEventListener('click', () => openModal('btnNewTender'));
   $('btnNewTenderPage')?.addEventListener('click', () => openModal('btnNewTenderPage'));
