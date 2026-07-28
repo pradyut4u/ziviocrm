@@ -2028,11 +2028,11 @@ function TabProject(t, tab, role) {
         ${edit ? `<button class="btn btn-primary btn-sm" id="btnSaveProjectInst">Save Installation</button>` : ''}
       </div>
       <div class="form-grid">
-        ${inputGroup('prj_inst','Installation Status',t.prj_inst,'select',edit,['Pending','In Progress','Completed'])}
-        ${inputGroup('prj_uat','Testing and UAT',t.prj_uat,'select',edit,['Pending','Passed','Failed'])}
-        ${inputGroup('prj_live','Live Monitoring',t.prj_live,'text',edit)}
-        ${inputGroup('prj_dism','Dismantling',t.prj_dism,'select',edit,['N/A','Pending','Done'])}
-        ${inputGroup('prj_close','Handover & Closure',t.prj_close,'select',edit,['Pending','Closed'])}
+        ${inputGroup('prj_inst','Installation Status',t.data?.prj_inst,'select',edit,['Pending','In Progress','Completed'])}
+        ${inputGroup('prj_uat','Testing and UAT',t.data?.prj_uat,'select',edit,['Pending','Passed','Failed'])}
+        ${inputGroup('prj_live','Live Monitoring',t.data?.prj_live,'text',edit)}
+        ${inputGroup('prj_dism','Dismantling',t.data?.prj_dism,'select',edit,['N/A','Pending','Done'])}
+        ${inputGroup('prj_close','Handover & Closure',t.data?.prj_close,'select',edit,['Pending','Closed'])}
       </div>
     </div>`; 
   }
@@ -3431,7 +3431,9 @@ function attachAll() {
   $('btnSaveProjectInst')?.addEventListener('click', async () => {
     const isLead = S.page === 'lead' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
+    const d = it.data || {};
     const b = {
+      ...d,
       prj_inst: $('prj_inst')?.value,
       prj_uat: $('prj_uat')?.value,
       prj_live: $('prj_live')?.value,
@@ -3440,10 +3442,10 @@ function attachAll() {
     };
     try {
       if (isLead) {
-        await api('PATCH', `/leads/${it.id}`, b);
+        await api('PATCH', `/leads/${it.id}`, { data: b });
         await loadLead(it.id);
       } else {
-        await api('PATCH', `/tenders/${it.id}`, b);
+        await api('PATCH', `/tenders/${it.id}`, { data: b });
         await loadTender(it.id);
       }
       render(); toast('Installation Saved!','success');
