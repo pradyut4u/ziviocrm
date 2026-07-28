@@ -1010,7 +1010,7 @@ function PageDashboard() {
             ${['tender','admin'].includes(role) ? '<button class="btn btn-primary btn-sm" id="btnNewTender">+ New Tender</button>' : ''}
             ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewOrder">+ New Order</button>`:''}
             ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProcurement">+ New Procurement</button>`:''}
-            ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProject">+ New Project</button>`:''}
+            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProject">+ New Project</button>`:''}
           </div>
         </div>
         ${tenders.length ? `
@@ -1186,7 +1186,7 @@ function renderAnalytics() {
     data.quickActions.push(
       { label: '+ New Order', id: 'btnDashNewOrder', iconKey: 'tender', show: ['admin','mgmt','tender','lead'].includes(role) },
       { label: '+ New Procurement', id: 'btnDashNewProcurement', iconKey: 'tender', show: ['admin','mgmt'].includes(role) },
-      { label: '+ New Project', id: 'btnDashNewProject', iconKey: 'tender', show: ['admin','mgmt'].includes(role) },
+      { label: '+ New Project', id: 'btnDashNewProject', iconKey: 'tender', show: ['admin','mgmt','tender','lead'].includes(role) },
       { label: '+ New Support Ticket', id: 'btnDashNewSupport', iconKey: 'lead', show: ['admin','mgmt','tech'].includes(role) },
       { label: '+ New Inventory', id: 'btnDashNewInventory', iconKey: 'lead', show: ['admin','mgmt'].includes(role) }
     );
@@ -1284,7 +1284,7 @@ function PageTenders() {
         ${['tender','admin'].includes(role)?`<button class="btn btn-primary" id="btnNewTenderPage">+ New Tender</button>`:''}
         ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" id="btnDashNewOrder">+ New Order</button>`:''}
         ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProcurement">+ New Procurement</button>`:''}
-        ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProject">+ New Project</button>`:''}
+        ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProject">+ New Project</button>`:''}
       </div>
     </div>
     ${list.length?`
@@ -1888,15 +1888,106 @@ function TabProcurement(t, role) {
 function TabProject(t, tab, role) { 
   const edit = (role === 'admin' || role === 'tech' || role === 'mgmt');
   if (tab === 'project_details') {
+  const d = t.data || {};
+  const items = d.items || [];
+  const customCols = d.custom_columns || [];
+  
+  const baseCols = ['Product Name', 'Qty', 'Price (₹)', 'GST %', 'Amount (₹)', 'Link', 'Description', 'Source of Purchase'];
+  const allCols = [...baseCols, ...customCols];
+  
+  let totalAmt = 0;
+  
+  const trs = items.map((item, idx) => {
+     let amount = 0;
+     const qty = parseFloat(item['Qty']) || 0;
+     const price = parseFloat(item['Price (₹)']) || 0;
+     const gst = parseFloat(item['GST %']) || 0;
+     amount = qty * price * (1 + (gst/100));
+     totalAmt += amount;
+     
+     const tds = allCols.map(c => {
+       if (c === 'Amount (₹)') {
+         return `<td><div class="kbd-val" style="padding:4px 8px;font-size:12px;background:#f9fafb;border-radius:4px;">₹${amount.toFixed(2)}</div></td>`;
+       }
+       if (!edit) return `<td><div class="kbd-val" style="font-size:12px;padding:4px 8px;">${esc(item[c]||'-')}</div></td>`;
+       return `<td><input type="text" class="form-input tbl-input" style="font-size:12px;padding:4px;" data-row="${idx}" data-col="${esc(c)}" value="${esc(item[c]||'')}"></td>`;
+     }).join('');
+     
+     return `<tr>${tds}<td style="width:40px">${edit ? `<button class="btn btn-ghost btn-sm text-red del-row-btn" data-row="${idx}">×</button>` : ''}</td></tr>`;
+  }).join('');
+  
+  let docsHtml = '';
+  const docs = t.documents || [];
+  if (docs.length) {
+    docsHtml = '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">' + docs.map(d => `
+      <div class="file-item">
+        <div class="file-icon">${fileIcon(d.mime)}</div>
+        <div class="file-details">
+          <div class="file-name"><a href="${d.url}" target="_blank">${esc(d.name)}</a></div>
+          <div class="file-meta">${fmt(d.size,'size')} • ${fmt(d.created_at,'date')}</div>
+        </div>
+        ${edit ? `<button class="btn btn-ghost text-red del-doc-btn" data-id="${d.id}">Delete</button>` : ''}
+      </div>
+    `).join('') + '</div>';
+  } else {
+    docsHtml = '<div class="empty" style="padding:16px"><div class="empty-icon">📁</div><div class="empty-title">No documents uploaded</div></div>';
+  }
+
     return `<div class="card">
-      <h3 style="margin-bottom:16px">Project Plan & Overview</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3>Project Plan & Overview</h3>
+        ${edit ? `<button class="btn btn-primary btn-sm" id="btnSaveProjectHeader">Save Header</button>` : ''}
+      </div>
       <div class="form-grid">
         ${inputGroup('prj_pm','Project Manager',t.prj_pm,'text',edit)}
         ${inputGroup('prj_plan','Project Plan',t.prj_plan,'text',edit)}
         ${inputGroup('prj_mat','Material Allocation',t.prj_mat,'text',edit)}
         ${inputGroup('prj_res','Resource Roster',t.prj_res,'text',edit)}
       </div>
-    </div>`;
+    </div>
+    
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <h3>Items</h3>
+      <div style="display:flex;gap:8px;">
+        ${edit ? `
+        <button class="btn btn-outline btn-sm" id="btnAddOrderCol">+ Add Column</button>
+        <button class="btn btn-outline btn-sm" id="btnAddOrderRow">+ Add Row</button>
+        <button class="btn btn-primary btn-sm" id="btnSaveOrderItems">Save Items</button>
+        ` : ''}
+        <button class="btn btn-primary btn-sm" id="btnExportOrderExcel" style="background:#10b981;border-color:#10b981">Export to Excel</button>
+      </div>
+    </div>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table style="min-width:800px;font-size:12px">
+        <thead>
+          <tr>
+            ${allCols.map(c => `<th style="white-space:nowrap">${esc(c)}</th>`).join('')}
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${trs}</tbody>
+        ${items.length ? `<tfoot><tr>
+           <td colspan="${allCols.indexOf('Amount (₹)')}" style="text-align:right;font-weight:700">Total:</td>
+           <td style="font-weight:700">₹${totalAmt.toFixed(2)}</td>
+           <td colspan="${allCols.length - allCols.indexOf('Amount (₹)')}"></td>
+        </tr></tfoot>` : ''}
+      </table>
+      ${!items.length ? '<div class="empty" style="padding:20px"><div class="empty-title">No items added</div></div>' : ''}
+    </div>
+  </div>
+  
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3>Documents</h3>
+      <div style="display:flex;gap:8px;">
+         <input type="file" id="orderDocsInput" multiple style="display:none">
+         ${edit ? `<button class="btn btn-outline btn-sm" onclick="document.getElementById('orderDocsInput').click()">+ Upload Files</button>` : ''}
+      </div>
+    </div>
+    ${docsHtml}
+  </div>
+    `;
   }
   if (tab === 'project_tasks') {
     return `<div class="card">
@@ -2196,6 +2287,7 @@ function PageLeads() {
         ${isAcipl && ['admin','mgmt','tech'].includes(role)?`<button class="btn btn-primary" id="btnDashNewSupport">+ New Support</button>`:''}
         ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewInventory">+ New Inventory</button>`:''}
         ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" id="btnDashNewOrder">+ New Order</button>`:''}
+        ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProject">+ New Project</button>`:''}
       </div>
     </div>
     ${list.length?`
@@ -3282,6 +3374,27 @@ function attachAll() {
   });
 
   // --- Order Flow Event Handlers ---
+  $('btnSaveProjectHeader')?.addEventListener('click', async () => {
+    const isLead = S.page === 'lead' || !!S.leadId;
+    const it = isLead ? S.leadItem : S.tender;
+    const b = {
+      prj_pm: $('prj_pm')?.value,
+      prj_plan: $('prj_plan')?.value,
+      prj_mat: $('prj_mat')?.value,
+      prj_res: $('prj_res')?.value
+    };
+    try {
+      if (isLead) {
+        await api('PATCH', `/leads/${it.id}`, b);
+        await loadLead(it.id);
+      } else {
+        await api('PATCH', `/tenders/${it.id}`, b);
+        await loadTender(it.id);
+      }
+      render(); toast('Project Header Saved!','success');
+    } catch(e) { toast(e.message,'error'); }
+  });
+
   $('btnSaveOrderHeader')?.addEventListener('click', async () => {
     const isLead = S.page === 'lead' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
