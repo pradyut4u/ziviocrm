@@ -1692,7 +1692,7 @@ function PageDetail() {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">${ActionBtns(t,role)}</div>
     </div>
-    ${Pipeline(t.stage)}
+    ${Pipeline(t.stage, t.data?.category)}
     <div class="tabs">${tabs.map(tb=>`<button class="tab-btn ${S.tab===tb.k?'active':''}" data-tab="${tb.k}">${tb.l}</button>`).join('')}</div>
     <div id="tab-body" style="padding-top:16px">${renderTab(t,S.tab,role)}</div>`;
 }
@@ -2126,7 +2126,7 @@ function LeadDetail() {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">${LeadActionBtns(t,role)}</div>
     </div>
-    ${Pipeline(t.stage)}
+    ${Pipeline(t.stage, t.data?.category)}
     <div class="tabs">${tabs.map(tb=>`<button class="tab-btn ${S.tab===tb.k?'active':''}" data-tab="${tb.k}">${tb.l}</button>`).join('')}</div>
     <div id="tab-body" style="padding-top:16px">${renderLeadTab(t,S.tab,role)}</div>`;
 }
@@ -2493,10 +2493,10 @@ function attachModalHandlers() {
     if (!bid) return toast('Reference Number is required','error');
     try {
       if (isLead) {
-        await api('POST','/leads',{ title: bid, org_name: $('ntOrg')?.value, data: { category: cat, description: $('ntTitle')?.value }, stage: 'ph1_draft' });
+        await api('POST','/leads',{ title: bid, org_name: $('ntOrg')?.value, data: { category: cat, description: $('ntTitle')?.value, delivery_address: $('ntAddress')?.value, customer_name: $('ntOrg')?.value }, stage: 'ph1_draft' });
         try { S.leads = await api('GET', '/leads') || []; } catch {}
       } else {
-        await api('POST','/tenders',{ bid_number: bid, title: $('ntTitle')?.value, org_name: $('ntOrg')?.value, data: { category: cat }, stage: 'ph1_draft' });
+        await api('POST','/tenders',{ bid_number: bid, title: $('ntTitle')?.value, org_name: $('ntOrg')?.value, data: { category: cat, delivery_address: $('ntAddress')?.value, customer_name: $('ntOrg')?.value, order_number: bid }, stage: 'ph1_draft' });
       }
       await loadTenders(); removeModal(); render(); toast('Record created!','success');
     } catch(e) { toast(e.message,'error'); }
