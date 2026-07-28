@@ -953,8 +953,8 @@ function PageDashboard() {
           <div class="sec-title" style="margin-bottom:0;flex:1">Leads Overview</div>
           <div style="display:flex;gap:8px;">
             ${['lead','admin'].includes(role) ? '<button class="btn btn-primary btn-sm" id="btnNewLead">+ New Lead</button>' : ''}
-            ${isAcipl && ['admin','mgmt','tech'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewSupport">+ New Support</button>`:''}
-            ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewInventory">+ New Inventory</button>`:''}
+            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewOrder">+ New Order</button>`:''}
+            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProject">+ New Project</button>`:''}
           </div>
         </div>
         ${leads.length ? `
@@ -1188,9 +1188,7 @@ function renderAnalytics() {
     data.quickActions.push(
       { label: '+ New Order', id: 'btnDashNewOrder', iconKey: 'tender', show: ['admin','mgmt','tender','lead'].includes(role) },
       { label: '+ New Procurement', id: 'btnDashNewProcurement', iconKey: 'tender', show: ['admin','mgmt'].includes(role) },
-      { label: '+ New Project', id: 'btnDashNewProject', iconKey: 'tender', show: ['admin','mgmt','tender','lead'].includes(role) },
-      { label: '+ New Support Ticket', id: 'btnDashNewSupport', iconKey: 'lead', show: ['admin','mgmt','tech'].includes(role) },
-      { label: '+ New Inventory', id: 'btnDashNewInventory', iconKey: 'lead', show: ['admin','mgmt'].includes(role) }
+      { label: '+ New Project', id: 'btnDashNewProject', iconKey: 'tender', show: ['admin','mgmt','tender','lead'].includes(role) }
     );
   }
 
@@ -2316,8 +2314,6 @@ function PageLeads() {
       <div class="page-actions" style="display:flex; gap:8px;">
         ${role === 'admin' ? `<button class="btn btn-outline" id="btnExportLeads">Export CSV</button>` : ''}
         ${['lead','admin'].includes(role)?`<button class="btn btn-primary" id="btnNewLeadPage">+ New Lead</button>`:''}
-        ${isAcipl && ['admin','mgmt','tech'].includes(role)?`<button class="btn btn-primary" id="btnDashNewSupport">+ New Support</button>`:''}
-        ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewInventory">+ New Inventory</button>`:''}
         ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" id="btnDashNewOrder">+ New Order</button>`:''}
         ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProject">+ New Project</button>`:''}
       </div>
