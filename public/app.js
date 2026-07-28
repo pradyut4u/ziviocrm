@@ -1886,7 +1886,7 @@ function TabProcurement(t, role) {
 }
 
 function TabProject(t, tab, role) { 
-  const edit = (role === 'admin' || role === 'tech' || role === 'mgmt');
+  const edit = ['admin', 'mgmt', 'tech', 'tender', 'lead'].includes(role);
   if (tab === 'project_details') {
   const d = t.data || {};
   const items = d.items || [];
