@@ -3280,6 +3280,167 @@ function attachAll() {
       try { await api('POST', `/tenders/${S.tenderId}/move`, { stage: 'ph2_active' }); await loadAll(); await loadTender(S.tenderId); render(); toast('Moved to Phase 2 — Technical', 'success'); } catch (e) { toast(e.message, 'error'); }
     }
   });
+
+  // --- Order Flow Event Handlers ---
+  $('btnSaveOrderHeader')?.addEventListener('click', async () => {
+    const isLead = S.page === 'lead' || !!S.leadId;
+    const it = isLead ? S.leadItem : S.tender;
+    const d = it.data || {};
+    const b = {
+      customer_name: $('ord_cust')?.value,
+      delivery_address: $('ord_addr')?.value
+    };
+    if (!isLead) b.order_number = $('ord_num')?.value;
+    try {
+      if (isLead) {
+        await api('PATCH', `/leads/${it.id}`, { data: { ...d, ...b } });
+        await loadLead(it.id);
+      } else {
+        await api('PATCH', `/tenders/${it.id}`, { data: { ...d, ...b } });
+        await loadTender(it.id);
+      }
+      render(); toast('Header Saved!','success');
+    } catch(e) { toast(e.message,'error'); }
+  });
+
+  $('btnAddOrderCol')?.addEventListener('click', async () => {
+    const colName = prompt('Enter new column name:');
+    if (!colName) return;
+    const isLead = S.page === 'lead' || !!S.leadId;
+    const it = isLead ? S.leadItem : S.tender;
+    const d = it.data || {};
+    const customCols = d.custom_columns || [];
+    if (customCols.includes(colName)) return toast('Column exists','error');
+    customCols.push(colName);
+    try {
+      const endpoint = isLead ? `/leads/${it.id}` : `/tenders/${it.id}`;
+      await api('PATCH', endpoint, { data: { ...d, custom_columns: customCols } });
+      isLead ? await loadLead(it.id) : await loadTender(it.id);
+      render(); toast('Column added','success');
+    } catch(e) { toast(e.message,'error'); }
+  });
+
+  $('btnAddOrderRow')?.addEventListener('click', async () => {
+    const isLead = S.page === 'lead' || !!S.leadId;
+    const it = isLead ? S.leadItem : S.tender;
+    const d = it.data || {};
+    const items = d.items || [];
+    items.push({});
+    try {
+      const endpoint = isLead ? `/leads/${it.id}` : `/tenders/${it.id}`;
+      await api('PATCH', endpoint, { data: { ...d, items } });
+      isLead ? await loadLead(it.id) : await loadTender(it.id);
+      render(); toast('Row added','success');
+    } catch(e) { toast(e.message,'error'); }
+  });
+
+  document.querySelectorAll('.del-row-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const isLead = S.page === 'lead' || !!S.leadId;
+      const it = isLead ? S.leadItem : S.tender;
+      const d = it.data || {};
+      const items = d.items || [];
+      const rowIdx = parseInt(e.target.dataset.row);
+      items.splice(rowIdx, 1);
+      try {
+        const endpoint = isLead ? `/leads/${it.id}` : `/tenders/${it.id}`;
+        await api('PATCH', endpoint, { data: { ...d, items } });
+        isLead ? await loadLead(it.id) : await loadTender(it.id);
+        render(); toast('Row deleted','success');
+      } catch(ex) { toast(ex.message,'error'); }
+    });
+  });
+
+  $('btnSaveOrderItems')?.addEventListener('click', async () => {
+    const isLead = S.page === 'lead' || !!S.leadId;
+    const it = isLead ? S.leadItem : S.tender;
+    const d = it.data || {};
+    const items = d.items || [];
+    
+    document.querySelectorAll('.tbl-input').forEach(inp => {
+       const rowIdx = parseInt(inp.dataset.row);
+       const colName = inp.dataset.col;
+       if (!items[rowIdx]) items[rowIdx] = {};
+       items[rowIdx][colName] = inp.value;
+    });
+
+    try {
+      const endpoint = isLead ? `/leads/${it.id}` : `/tenders/${it.id}`;
+      await api('PATCH', endpoint, { data: { ...d, items } });
+      isLead ? await loadLead(it.id) : await loadTender(it.id);
+      render(); toast('Items Saved!','success');
+    } catch(e) { toast(e.message,'error'); }
+  });
+
+  $('btnFinaliseOrder')?.addEventListener('click', async () => {
+    if (!confirm('Finalise order? This will skip to Phase 5 (Billing).')) return;
+    const isLead = S.page === 'lead' || !!S.leadId;
+    const it = isLead ? S.leadItem : S.tender;
+    try {
+      const endpoint = isLead ? `/leads/${it.id}/move` : `/tenders/${it.id}/move`;
+      await api('POST', endpoint, { stage: 'ph5_active' });
+      isLead ? await loadLead(it.id) : await loadTender(it.id);
+      render(); toast('Order Finalised! Moved to Billing.', 'success');
+    } catch(e) { toast(e.message, 'error'); }
+  });
+
+  const orderDocInput = $('orderDocsInput');
+  if (orderDocInput) {
+    orderDocInput.addEventListener('change', async () => {
+       const isLead = S.page === 'lead' || !!S.leadId;
+       const it = isLead ? S.leadItem : S.tender;
+       if (!orderDocInput.files.length) return;
+       for (let i=0; i<orderDocInput.files.length; i++) {
+         const fd = new FormData(); fd.append('file', orderDocInput.files[i]);
+         try {
+           const endpoint = isLead ? `/leads/${it.id}/documents` : `/tenders/${it.id}/documents`;
+           await up(endpoint, fd);
+         } catch(e) { toast(e.message, 'error'); }
+       }
+       toast('Files uploaded', 'success');
+       isLead ? await loadLead(it.id) : await loadTender(it.id);
+       render();
+    });
+  }
+
+  document.querySelectorAll('.del-doc-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+       if(!confirm('Delete this document?')) return;
+       const isLead = S.page === 'lead' || !!S.leadId;
+       const it = isLead ? S.leadItem : S.tender;
+       const docId = e.target.dataset.id;
+       try {
+         const endpoint = isLead ? `/leads/${it.id}/documents/${docId}` : `/tenders/${it.id}/documents/${docId}`;
+         await api('DELETE', endpoint);
+         toast('Document deleted', 'success');
+         isLead ? await loadLead(it.id) : await loadTender(it.id);
+         render();
+       } catch(ex) { toast(ex.message, 'error'); }
+    });
+  });
+
+  $('btnExportOrderExcel')?.addEventListener('click', () => {
+    const isLead = S.page === 'lead' || !!S.leadId;
+    const it = isLead ? S.leadItem : S.tender;
+    const d = it.data || {};
+    const items = d.items || [];
+    if (!items.length) return toast('No items to export','error');
+    
+    // Auto calculate amounts for export
+    const exportData = items.map(item => {
+       const qty = parseFloat(item['Qty']) || 0;
+       const price = parseFloat(item['Price (₹)']) || 0;
+       const gst = parseFloat(item['GST %']) || 0;
+       const amount = qty * price * (1 + (gst/100));
+       return { ...item, 'Amount (₹)': amount.toFixed(2) };
+    });
+    
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Order Items");
+    XLSX.writeFile(wb, `Order_${it.title || 'Export'}.xlsx`);
+  });
+
 }
 
 window.calcTotal = function() {
