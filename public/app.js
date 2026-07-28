@@ -1758,7 +1758,7 @@ function renderTab(t, tab, role) {
 }
 
 function TabOrderDetails(t, role, isLead) {
-  const edit = (role === 'admin' || role === 'mgmt');
+  const edit = ['admin', 'mgmt', 'tender', 'lead'].includes(role);
   const d = t.data || {};
   const items = d.items || [];
   const customCols = d.custom_columns || [];
@@ -1780,10 +1780,11 @@ function TabOrderDetails(t, role, isLead) {
        if (c === 'Amount (₹)') {
          return `<td><div class="kbd-val" style="padding:4px 8px;font-size:12px;background:#f9fafb;border-radius:4px;">₹${amount.toFixed(2)}</div></td>`;
        }
+       if (!edit) return `<td><div class="kbd-val" style="font-size:12px;padding:4px 8px;">${esc(item[c]||'-')}</div></td>`;
        return `<td><input type="text" class="form-input tbl-input" style="font-size:12px;padding:4px;" data-row="${idx}" data-col="${esc(c)}" value="${esc(item[c]||'')}"></td>`;
      }).join('');
      
-     return `<tr>${tds}<td style="width:40px"><button class="btn btn-ghost btn-sm text-red del-row-btn" data-row="${idx}">×</button></td></tr>`;
+     return `<tr>${tds}<td style="width:40px">${edit ? `<button class="btn btn-ghost btn-sm text-red del-row-btn" data-row="${idx}">×</button>` : ''}</td></tr>`;
   }).join('');
   
   let docsHtml = '';
@@ -1796,7 +1797,7 @@ function TabOrderDetails(t, role, isLead) {
           <div class="file-name"><a href="${d.url}" target="_blank">${esc(d.name)}</a></div>
           <div class="file-meta">${fmt(d.size,'size')} • ${fmt(d.created_at,'date')}</div>
         </div>
-        <button class="btn btn-ghost text-red del-doc-btn" data-id="${d.id}">Delete</button>
+        ${edit ? `<button class="btn btn-ghost text-red del-doc-btn" data-id="${d.id}">Delete</button>` : ''}
       </div>
     `).join('') + '</div>';
   } else {
@@ -1806,7 +1807,7 @@ function TabOrderDetails(t, role, isLead) {
   return `<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h3>Order Details</h3>
-      <button class="btn btn-primary btn-sm" id="btnSaveOrderHeader">Save Header</button>
+      ${edit ? `<button class="btn btn-primary btn-sm" id="btnSaveOrderHeader">Save Header</button>` : ''}
     </div>
     <div class="form-grid">
       ${!isLead ? inputGroup('ord_num','Order Number',d.order_number,'text',edit) : ''}
@@ -1819,9 +1820,11 @@ function TabOrderDetails(t, role, isLead) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
       <h3>Items</h3>
       <div style="display:flex;gap:8px;">
+        ${edit ? `
         <button class="btn btn-outline btn-sm" id="btnAddOrderCol">+ Add Column</button>
         <button class="btn btn-outline btn-sm" id="btnAddOrderRow">+ Add Row</button>
         <button class="btn btn-primary btn-sm" id="btnSaveOrderItems">Save Items</button>
+        ` : ''}
         <button class="btn btn-primary btn-sm" id="btnExportOrderExcel" style="background:#10b981;border-color:#10b981">Export to Excel</button>
       </div>
     </div>
@@ -1849,7 +1852,7 @@ function TabOrderDetails(t, role, isLead) {
       <h3>Documents</h3>
       <div style="display:flex;gap:8px;">
          <input type="file" id="orderDocsInput" multiple style="display:none">
-         <button class="btn btn-outline btn-sm" onclick="document.getElementById('orderDocsInput').click()">+ Upload Files</button>
+         ${edit ? `<button class="btn btn-outline btn-sm" onclick="document.getElementById('orderDocsInput').click()">+ Upload Files</button>` : ''}
       </div>
     </div>
     ${docsHtml}
