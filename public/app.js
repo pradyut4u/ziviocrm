@@ -140,8 +140,11 @@ async function notify(userId, title, message, type = 'info', linkId = null) {
 
 async function notifyRole(roleName, title, message, type = 'info', linkId = null) {
   const { data: users } = await sbClient.from('users').select('*').eq('role', roleName).eq('status', 'active');
-  if (users) {
-    for (const u of users) {
+  if (!users) return;
+  const { data: wu } = await sbClient.from('workspace_users').select('user_id').eq('workspace_id', S.workspaceId);
+  const allowed = wu ? wu.map(w => w.user_id) : [];
+  for (const u of users) {
+    if (u.role === 'admin' || allowed.includes(u.id)) {
       await notify(u.id, title, message, type, linkId);
     }
   }
@@ -180,6 +183,23 @@ async function api(method, path, body) {
   
   if (path === '/users' && method === 'GET') {
     const { data } = await sbClient.from('users').select('*'); return data;
+  }
+  
+  if (path === '/users' && method === 'POST') {
+    const { data: authData, error: authError } = await sbClient.auth.signUp({
+      email: body.email,
+      password: body.password,
+    });
+    if (authError) throw authError;
+    const { data, error } = await sbClient.from('users').insert([{
+      id: authData.user?.id,
+      name: body.name,
+      email: body.email,
+      role: body.role,
+      status: 'active'
+    }]).select().single();
+    if (error) throw error;
+    return data;
   }
   
   if (path === '/tenders' || path === '/leads') {
@@ -365,6 +385,14 @@ async function api(method, path, body) {
     }
   }
   
+  const docDelMatch = path.match(/^\/(tenders|leads)\/[^\/]+\/documents\/([^\/]+)$/);
+  if (docDelMatch && method === 'DELETE') {
+    const table = docDelMatch[1] === 'leads' ? 'lead_documents' : 'tender_documents';
+    const { error } = await sbClient.from(table).delete().eq('id', docDelMatch[2]);
+    if (error) throw error;
+    return { success: true };
+  }
+  
   throw new Error('Not implemented: ' + method + ' ' + path);
 }
 
@@ -439,12 +467,12 @@ async function up(path, fd) {
     await sbClient.from(prefix + 'invoices').insert({
       [pId]: id, created_by: S.user.id, workspace_id: S.workspaceId,
       invoice_number: fd.get('invoice_number'),
-      notif_to_tender_date: fd.get('notif_to_tender_date') || fd.get('notif_to_lead_date'), // handle both
+      [prefix === 'lead_' ? 'notif_to_lead_date' : 'notif_to_tender_date']: fd.get('notif_to_tender_date') || fd.get('notif_to_lead_date'),
       award_date: fd.get('award_date'),
-      total_price: parseFloat(fd.get('total_price')),
-      billing_price: parseFloat(fd.get('billing_price')),
-      base_price: parseFloat(fd.get('base_price')),
-      gst_pct: parseFloat(fd.get('gst_pct')),
+      total_price: parseFloat(fd.get('total_price') || 0),
+      billing_price: parseFloat(fd.get('billing_price') || 0),
+      base_price: parseFloat(fd.get('base_price') || 0),
+      gst_pct: parseFloat(fd.get('gst_pct') || 0),
       duration_from: fd.get('duration_from'),
       duration_to: fd.get('duration_to'),
       payment_cycle: fd.get('payment_cycle'),
@@ -495,6 +523,9 @@ window.switchWorkspace = async function(id) {
   localStorage.setItem('_ws', id);
   S.tenderId = null;
   S.leadId = null;
+  S.tender = null;
+  S.leadItem = null;
+  S.tab = null;
   await loadAll();
   render();
 };
@@ -532,7 +563,7 @@ function setupRealtime() {
 
 async function loadAll() {
   const p = [loadTenders(), loadLeads(), loadNotifs()];
-  if (['admin', 'mgmt'].includes(S.user?.role)) p.push(loadAudit());
+  if (['admin', 'mgmt'].includes(S.user?.role)) { p.push(loadAudit()); p.push(loadUsers()); }
   await Promise.all(p);
 }
 
@@ -953,8 +984,8 @@ function PageDashboard() {
           <div class="sec-title" style="margin-bottom:0;flex:1">Leads Overview</div>
           <div style="display:flex;gap:8px;">
             ${['lead','admin'].includes(role) ? '<button class="btn btn-primary btn-sm" id="btnNewLead">+ New Lead</button>' : ''}
-            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewOrder">+ New Order</button>`:''}
-            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProject">+ New Project</button>`:''}
+            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" onclick="openModal('create-order')">+ New Order</button>`:''}
+            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" onclick="openModal('create-project')">+ New Project</button>`:''}
           </div>
         </div>
         ${leads.length ? `
@@ -1010,9 +1041,8 @@ function PageDashboard() {
           <div class="sec-title" style="margin-bottom:0;flex:1">Tenders Overview</div>
           <div style="display:flex;gap:8px;">
             ${['tender','admin'].includes(role) ? '<button class="btn btn-primary btn-sm" id="btnNewTender">+ New Tender</button>' : ''}
-            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewOrder">+ New Order</button>`:''}
-            ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProcurement">+ New Procurement</button>`:''}
-            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" id="btnDashNewProject">+ New Project</button>`:''}
+            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" onclick="openModal('create-order')">+ New Order</button>`:''}
+            ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary btn-sm" onclick="openModal('create-project')">+ New Project</button>`:''}
           </div>
         </div>
         ${tenders.length ? `
@@ -1100,7 +1130,7 @@ function renderAnalytics() {
   // KPIs
   const totalLeads = filteredLeads.length;
   const liveTenders = filteredTenders.filter(t => !['closed', 'ph3_disqualified'].includes(t.stage)).length;
-  const awardedTenders = filteredTenders.filter(t => t.stage === 'ph3_awarded').length;
+  const awardedTenders = filteredTenders.filter(t => ['ph3_awarded', 'ph4_active', 'ph4_complete', 'ph5_active', 'closed'].includes(t.stage)).length;
   
   let revenue = 0;
   let pendingBilling = 0;
@@ -1187,7 +1217,6 @@ function renderAnalytics() {
   if (isAcipl) {
     data.quickActions.push(
       { label: '+ New Order', id: 'btnDashNewOrder', iconKey: 'tender', show: ['admin','mgmt','tender','lead'].includes(role) },
-      { label: '+ New Procurement', id: 'btnDashNewProcurement', iconKey: 'tender', show: ['admin','mgmt'].includes(role) },
       { label: '+ New Project', id: 'btnDashNewProject', iconKey: 'tender', show: ['admin','mgmt','tender','lead'].includes(role) }
     );
   }
@@ -1227,10 +1256,11 @@ function renderAnalytics() {
   data.monthlyRevenue = Object.entries(revMap).map(e => ({ label: e[0], value: e[1] }));
 
   // Tender Overview
-  const tenderStatus = { 'Awarded': 0, 'In Progress': 0, 'Lost': 0 };
+  const tenderStatus = { 'Awarded': 0, 'In Progress': 0, 'Lost': 0, 'Completed': 0 };
   allItems.forEach(t => {
     if (t.stage === 'ph3_awarded' || t.stage === 'ph4_active' || t.stage === 'ph4_complete' || t.stage === 'ph5_active') tenderStatus['Awarded']++;
-    else if (t.stage === 'closed' || t.stage === 'ph3_disqualified') tenderStatus['Lost']++;
+    else if (t.stage === 'closed') tenderStatus['Completed']++;
+    else if (t.stage === 'ph3_disqualified') tenderStatus['Lost']++;
     else tenderStatus['In Progress']++;
   });
   data.tenderOverview = Object.entries(tenderStatus).map(e => ({ label: e[0], value: e[1] }));
@@ -1284,9 +1314,8 @@ function PageTenders() {
       <div class="page-actions" style="display:flex; gap:8px;">
         ${role === 'admin' ? `<button class="btn btn-outline" id="btnExportTenders">Export CSV</button>` : ''}
         ${['tender','admin'].includes(role)?`<button class="btn btn-primary" id="btnNewTenderPage">+ New Tender</button>`:''}
-        ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" id="btnDashNewOrder">+ New Order</button>`:''}
-        ${isAcipl && ['admin','mgmt'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProcurement">+ New Procurement</button>`:''}
-        ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" id="btnDashNewProject">+ New Project</button>`:''}
+        ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" onclick="openModal('create-order')">+ New Order</button>`:''}
+        ${isAcipl && ['admin','mgmt','tender','lead'].includes(role)?`<button class="btn btn-primary" onclick="openModal('create-project')">+ New Project</button>`:''}
       </div>
     </div>
     ${list.length?`
@@ -1541,7 +1570,17 @@ async function createWorkspace() {
     const newId = data[0].id;
     await sbClient.from('workspace_users').upsert({ workspace_id: newId, user_id: S.user.id }, { onConflict: 'workspace_id,user_id', ignoreDuplicates: true });
     
-    S.workspaces.push({ id: newId, name });
+    // Reload workspaces
+    let ws = [];
+    if (S.user.role === 'admin') {
+      const { data } = await sbClient.from('workspaces').select('*');
+      ws = data || [];
+    } else {
+      const { data } = await sbClient.from('workspace_users').select('workspaces(*)').eq('user_id', S.user.id);
+      ws = data ? data.map(d => d.workspaces).filter(Boolean) : [];
+    }
+    S.workspaces = ws;
+    
     render();
     if (typeof toast !== 'undefined') toast('Workspace created', 'success');
   } catch(e) {
@@ -1555,6 +1594,7 @@ async function openManageAccess(wsId) {
   S.managingWorkspaceUsers = [];
   
   try {
+    if (!S.users || S.users.length === 0) await loadUsers();
     const { data, error } = await sbClient.from('workspace_users').select('user_id').eq('workspace_id', wsId);
     if (error) throw error;
     S.managingWorkspaceUsers = data ? data.map(d => d.user_id) : [];
@@ -1615,48 +1655,6 @@ async function toggleWorkspaceAccess(userId, hasAccess) {
   }
 }
 
-function renderAdminTab() {
-  if (S.adminTab==='audit') return `
-    <div class="table-wrap"><table>
-      <thead><tr><th>Time</th><th>Action</th><th>Entity</th><th>User</th></tr></thead>
-      <tbody>${S.audit.slice(0,80).map(l=>{
-        let det = '';
-        if (l.details) {
-          try {
-            const d = typeof l.details === 'string' ? JSON.parse(l.details) : l.details;
-            const ks = Object.keys(d);
-            if (ks.length) det = '<div style="font-size:10.5px; color:var(--text3); margin-top:4px;">' + ks.map(k => esc(k) + ': ' + esc(d[k])).join(' | ') + '</div>';
-          } catch(e){}
-        }
-        return `
-        <tr><td style="color:var(--text2);font-size:11.5px;white-space:nowrap">${timeAgo(l.created_at)}</td>
-        <td>
-          <span class="badge b-blue">${esc(l.action)}</span>
-          ${det}
-        </td>
-        <td style="font-size:12px;color:var(--text2)">${esc(l.entity_type)}</td>
-        <td style="font-size:11px;color:var(--text3)">${(l.user_id||'').slice(0,8)}</td></tr>`;
-      }).join('')}
-      ${!S.audit.length?`<tr><td colspan="4"><div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No logs yet</div></div></td></tr>`:''}
-      </tbody>
-    </table></div>`;
-
-  return `
-    <div class="table-wrap"><table>
-      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Status</th></tr></thead>
-      <tbody>${S.users.map(u=>`
-        <tr><td><div style="display:flex;align-items:center;gap:10px">
-          <div class="avatar" style="width:28px;height:28px;font-size:11px">${(u.name||'U')[0]}</div>
-          <span style="font-weight:600">${esc(u.name)}</span></div></td>
-          <td style="color:var(--text2)">${esc(u.email)}</td>
-          <td><span class="badge b-blue">${roleLabel(u.role)}</span></td>
-          <td style="color:var(--text2)">${esc(u.department||'-')}</td>
-          <td><span class="badge ${u.status==='active'?'b-green':'b-red'}">${u.status}</span></td>
-        </tr>`).join('')}
-      </tbody>
-    </table></div>`;
-}
-
 function NotifPanel() {
   return `
     <div class="notif-panel">
@@ -1666,7 +1664,7 @@ function NotifPanel() {
       </div>
       <div class="notif-list">
         ${S.notifications.map(n => `
-          <div class="notif-item ${!n.read?'unread':''}" ${n.tender_id?`onclick="const isTender=(S.tenders||[]).find(x=>x.id==='${n.tender_id}');if(isTender){S.tenderId='${n.tender_id}';S.page='tenders';loadTender('${n.tender_id}').then(()=>render());}else{S.leadId='${n.tender_id}';S.page='leads';loadLead('${n.tender_id}').then(()=>render());}"`:''}>
+          <div class="notif-item ${!n.read?'unread':''}" ${n.link_id?`onclick="const isTender=(S.tenders||[]).find(x=>x.id==='${n.link_id}');if(isTender){S.tenderId='${n.link_id}';S.page='tenders';loadTender('${n.link_id}').then(()=>render());}else{S.leadId='${n.link_id}';S.page='leads';loadLead('${n.link_id}').then(()=>render());}"`:''}>
             <div class="notif-t">${esc(n.title)}</div>
             <div class="notif-m">${esc(n.message)}</div>
             <div class="notif-time">${timeAgo(n.created_at)}</div>
@@ -1727,7 +1725,7 @@ function detailTabs(t, role) {
     return tabs;
   }
 
-  if (role === 'tender' || role === 'admin') {
+  if (role === 'tender' || role === 'admin' || role === 'mgmt') {
       tabs.push({k:'tender_info',l:'Phase 1: Tender'});
   }
   if (si >= ALL.indexOf('ph2_active')) tabs.push({k:'technical',l:'Phase 2: Technical'});
@@ -1826,7 +1824,7 @@ function TabOrderDetails(t, role, isLead) {
       ${edit ? `<button class="btn btn-primary btn-sm" id="btnSaveOrderHeader">Save Header</button>` : ''}
     </div>
     <div class="form-grid">
-      ${!isLead ? inputGroup('ord_num','Order Number',d.order_number,'text',edit) : ''}
+      ${inputGroup('ord_num','Order Number',d.order_number || t.requirements?.order_number,'text',edit)}
       ${inputGroup('ord_cust','Customer Name',d.customer_name || t.org_name,'text',edit)}
       ${inputGroup('ord_addr','Delivery Address',d.delivery_address,'textarea',edit)}
     </div>
@@ -1857,6 +1855,7 @@ function TabOrderDetails(t, role, isLead) {
            <td colspan="${allCols.indexOf('Amount (₹)')}" style="text-align:right;font-weight:700">Total:</td>
            <td style="font-weight:700">₹${totalAmt.toFixed(2)}</td>
            <td colspan="${allCols.length - allCols.indexOf('Amount (₹)')}"></td>
+           <td></td>
         </tr></tfoot>` : ''}
       </table>
       ${!items.length ? '<div class="empty" style="padding:20px"><div class="empty-title">No items added</div></div>' : ''}
@@ -1888,15 +1887,19 @@ function TabOrderDetails(t, role, isLead) {
 
 function TabProcurement(t, role) { 
   const edit = (role === 'admin' || role === 'mgmt');
+  const d = t.data || {};
   return `<div class="card">
-    <h3 style="margin-bottom:16px">Procurement Form</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3>Procurement Form</h3>
+      ${edit ? `<button class="btn btn-primary btn-sm" id="btnSaveProcurement">Save Procurement</button>` : ''}
+    </div>
     <div class="form-grid">
-      ${inputGroup('pr_req','Purchase Request #',t.pr_req,'text',edit)}
-      ${inputGroup('pr_rfq','RFQ ID',t.pr_rfq,'text',edit)}
-      ${inputGroup('pr_vq','Vendor Quotation',t.pr_vq,'text',edit)}
-      ${inputGroup('pr_po','Purchase Order',t.pr_po,'text',edit)}
-      ${inputGroup('pr_grn','GRN / Material Tracking',t.pr_grn,'text',edit)}
-      ${inputGroup('pr_bill','Vendor Bill',t.pr_bill,'text',edit)}
+      ${inputGroup('pr_req','Purchase Request #',d.pr_req,'text',edit)}
+      ${inputGroup('pr_rfq','RFQ ID',d.pr_rfq,'text',edit)}
+      ${inputGroup('pr_vq','Vendor Quotation',d.pr_vq,'text',edit)}
+      ${inputGroup('pr_po','Purchase Order',d.pr_po,'text',edit)}
+      ${inputGroup('pr_grn','GRN / Material Tracking',d.pr_grn,'text',edit)}
+      ${inputGroup('pr_bill','Vendor Bill',d.pr_bill,'text',edit)}
     </div>
   </div>`; 
 }
@@ -1990,6 +1993,7 @@ function TabProject(t, tab, role) {
            <td colspan="${allCols.indexOf('Amount (₹)')}" style="text-align:right;font-weight:700">Total:</td>
            <td style="font-weight:700">₹${totalAmt.toFixed(2)}</td>
            <td colspan="${allCols.length - allCols.indexOf('Amount (₹)')}"></td>
+           <td></td>
         </tr></tfoot>` : ''}
       </table>
       ${!items.length ? '<div class="empty" style="padding:20px"><div class="empty-title">No items added</div></div>' : ''}
@@ -2009,19 +2013,7 @@ function TabProject(t, tab, role) {
     `;
   }
   if (tab === 'project_technical') {
-    const d = t.data || {};
-    const isLead = window.S?.page === 'leads' || !!window.S?.leadId;
-    return `<div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h3>Project Plan & Overview</h3>
-        ${edit ? `<button class="btn btn-primary btn-sm" id="btnSaveOrderHeader">Save Header</button>` : ''}
-      </div>
-      <div class="form-grid">
-        ${!isLead ? inputGroup('ord_num','Project Number',d.project_number || d.order_number || t.requirements?.order_number,'text',edit) : ''}
-        ${inputGroup('ord_cust','Customer Name',d.customer_name || t.org_name,'text',edit)}
-        ${inputGroup('ord_addr','Delivery Address',d.delivery_address,'textarea',edit)}
-      </div>
-    </div>`;
+    return TabTechnical(t, role);
   }
   if (tab === 'project_installation') {
     return `<div class="card">
@@ -2382,7 +2374,7 @@ function leadTabs(t, role) {
   const ALL = STAGES;
   const si = ALL.indexOf(t.stage);
   const tabs = [];
-  if (role === 'lead' || role === 'admin') {
+  if (role === 'lead' || role === 'admin' || role === 'mgmt') {
       tabs.push({k:'lead_info',l:'Phase 1: Lead'});
   }
   if (si >= ALL.indexOf('ph2_active')) tabs.push({k:'technical',l:'Phase 2: Technical'});
@@ -2400,7 +2392,7 @@ function LeadActionBtns(t, role) {
 
   if (role === 'lead' || role === 'admin') {
      if (t.stage === 'ph1_draft') btns.push(`<button class="btn btn-primary btn-sm" id="btnSubmitPh1Lead">Submit to Technical (Ph2)</button>`);
-     if (t.stage === 'ph3_active' && t.data?.category !== 'project') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph3-award">Declare Award / Disqualify</button>`);
+     if (t.stage === 'ph3_active' && t.data?.category !== 'project') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph3-award">Declare Award / Disqualify / Qualified</button>`);
   }
   if (role === 'tech' || role === 'admin') {
      if (t.stage === 'ph2_active') btns.push(`<button class="btn btn-primary btn-sm" data-modal="ph2-report">Submit Technical Report</button>`);
@@ -2439,6 +2431,7 @@ function TabSupport(t, tab, role) {
         ${inputGroup('sup_desc','Issue Description',t.sup_desc,'textarea',edit)}
         ${inputGroup('sup_sla','SLA Status',t.sup_sla,'select',edit,['Within SLA','SLA Breached'])}
       </div>
+      ${edit ? `<button class="btn btn-primary" id="btnSaveSupport" style="margin-top:16px">Save Support Form</button>` : ''}
     </div>`;
   }
   return `<div class="card">
@@ -2447,6 +2440,7 @@ function TabSupport(t, tab, role) {
       ${inputGroup('sup_rca','Root Cause Analysis (RCA)',t.sup_rca,'textarea',edit)}
       ${inputGroup('sup_kb','Knowledge Base Reference',t.sup_kb,'text',edit)}
     </div>
+    ${edit ? `<button class="btn btn-primary" id="btnSaveSupport" style="margin-top:16px">Save Support Form</button>` : ''}
   </div>`;
 }
 
@@ -2461,6 +2455,7 @@ function TabInventory(t, tab, role) {
         ${inputGroup('inv_serial','Serialized Assets',t.inv_serial,'textarea',edit)}
         ${inputGroup('inv_cust','Customer / Rental Assets',t.inv_cust,'text',edit)}
       </div>
+      ${edit ? `<button class="btn btn-primary" id="btnSaveInventory" style="margin-top:16px">Save Inventory</button>` : ''}
     </div>`;
   }
   return `<div class="card">
@@ -2471,6 +2466,7 @@ function TabInventory(t, tab, role) {
       ${inputGroup('inv_rma','Returns / RMA',t.inv_rma,'text',edit)}
       ${inputGroup('inv_audit','Stock Audit Status',t.inv_audit,'text',edit)}
     </div>
+    ${edit ? `<button class="btn btn-primary" id="btnSaveInventory" style="margin-top:16px">Save Inventory</button>` : ''}
   </div>`;
 }
 
@@ -2740,7 +2736,8 @@ function attachModalHandlers() {
   $('saveNewTenderBtn')?.addEventListener('click', async () => {
     const bid = $('ntBid')?.value;
     const cat = $('ntCat')?.value || '';
-    const isLead = $('ntIsLead')?.value === 'true';
+    const ntIsLeadEl = $('ntIsLead');
+    const isLead = ntIsLeadEl ? (ntIsLeadEl.type === 'checkbox' ? ntIsLeadEl.checked : ntIsLeadEl.value === 'true') : false;
     if (!bid) return toast('Reference Number is required','error');
     try {
       if (isLead) {
@@ -2749,7 +2746,8 @@ function attachModalHandlers() {
       } else {
         await api('POST','/tenders',{ bid_number: bid, title: $('ntTitle')?.value, org_name: $('ntOrg')?.value, data: { category: cat, delivery_address: $('ntAddress')?.value, customer_name: $('ntOrg')?.value, order_number: bid }, stage: 'ph1_draft' });
       }
-      await loadTenders(); removeModal(); render(); toast('Record created!','success');
+      if (isLead) await loadLeads(); else await loadTenders();
+      removeModal(); render(); toast('Record created!','success');
     } catch(e) { toast(e.message,'error'); }
   });
 
@@ -2822,12 +2820,12 @@ function attachModalHandlers() {
      let v4Addrs = [], v6Addrs = [], routers = [];
      for(let i=1; i<=numV4; i++) {
         let val = $('m4_ipv4_'+i)?.value;
-        if (!val) return toast('Invalid IPv4 Pool '+i, 'error');
+        if (!val || !ipv4Regex.test(val)) return toast('Invalid IPv4 Pool '+i, 'error');
         v4Addrs.push(val);
      }
      for(let i=1; i<=numV6; i++) {
         let val = $('m4_ipv6_'+i)?.value;
-        if (!val) return toast('Invalid IPv6 Pool '+i, 'error');
+        if (!val || !ipv6Regex.test(val)) return toast('Invalid IPv6 Pool '+i, 'error');
         v6Addrs.push(val);
      }
      for(let i=1; i<=numRouters; i++) {
@@ -2862,7 +2860,10 @@ function attachModalHandlers() {
 
   $('ph5CycBtn')?.addEventListener('click', async()=>{
      const cid = $('mc_id')?.value;
+     const source = S.leadId ? S.leadItem : S.tender;
+     const cycs = source?.payment_cycles || [];
      const b = {
+        cycle_number: $('mc_cn')?.value || (cid ? undefined : cycs.length + 1),
         period_from: $('mc_pf').value, period_to: $('mc_pt').value, amount_due: $('mc_ad').value,
         payment_status: $('mc_ps').value, amount_received: $('mc_ar').value, payment_date: $('mc_pd').value
      };
@@ -2882,7 +2883,7 @@ window.editCycle = (cid) => {
     if(!c) return;
     openModal('ph5-cycle');
     setTimeout(()=>{
-       $('mc_id').value=cid; $('mc_pf').value=c.period_from||''; $('mc_pt').value=c.period_to||'';
+       $('mc_id').value=cid; $('mc_cn').value=c.cycle_number||''; $('mc_pf').value=c.period_from||''; $('mc_pt').value=c.period_to||'';
        $('mc_ad').value=c.amount_due||''; $('mc_ps').value=c.payment_status||'Pending';
        $('mc_ar').value=c.amount_received||''; $('mc_pd').value=c.payment_date||'';
     },50);
@@ -2903,7 +2904,7 @@ function openModal(id) {
     
     showModal(MW(title, `
       <input type="hidden" id="ntCat" value="${cat}">
-      ${['order','project'].includes(cat) ? '<div class="form-group" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="ntIsLead" value="true"> <label for="ntIsLead" class="form-label" style="margin:0;cursor:pointer">Store as Lead (direct/internal)</label></div>' : '<input type="hidden" id="ntIsLead" value="'+(isLeadCat ? 'true' : 'false')+'">'}
+      ${['order','project'].includes(cat) ? '<div class="form-group"><label class="custom-toggle" style="margin: 0 auto; width: fit-content; margin-bottom: 16px;"><input type="checkbox" id="ntIsLead" value="true"><div class="toggle-track"></div><div class="toggle-label">Store as Lead (Direct/Internal)</div></label></div>' : '<input type="hidden" id="ntIsLead" value="'+(isLeadCat ? 'true' : 'false')+'">'}
       <div class="form-group"><label class="form-label">${isLeadCat || ['order','project'].includes(cat) ? 'Reference / Order Number' : 'Reference / Bid Number'} *</label><input type="text" id="ntBid" class="form-input"></div>
       <div class="form-group"><label class="form-label">Description / Name</label><input type="text" id="ntTitle" class="form-input"></div>
       <div class="form-group"><label class="form-label">Customer / Organisation Name</label><input type="text" id="ntOrg" class="form-input"></div>
@@ -3037,6 +3038,7 @@ function openModal(id) {
     showModal(MW('Payment Cycle', `
       <input type="hidden" id="mc_id">
       <div class="grid g2">
+         ${inputGroup('mc_cn','Cycle Number','','number',true)}
          ${inputGroup('mc_pf','Period From','','date',true)}
          ${inputGroup('mc_pt','Period To','','date',true)}
          ${inputGroup('mc_ad','Amount Due','','number',true)}
@@ -3272,37 +3274,32 @@ function attachAll() {
     el.addEventListener('click', async () => { 
        document.querySelector('.sidebar')?.classList.remove('open');
        $('sidebarOverlay')?.classList.remove('open');
-       S.page=el.dataset.nav; S.tenderId=null; 
+       S.page=el.dataset.nav; S.tenderId=null; S.leadId=null; S.leadItem=null; S.tender=null; S.tab=null;
        if (S.page === 'admin') {
            await loadUsers(); await loadAudit();
        }
        render(); 
     });
   });
-  document.querySelectorAll('[data-atab]').forEach(el => {
-    el.addEventListener('click', () => { 
-       S.adminTab=el.dataset.atab; 
-       document.querySelectorAll('[data-atab]').forEach(b => b.classList.remove('active'));
-       el.classList.add('active');
-       const c = $('atab-content'); if (c) c.innerHTML = renderAdminTab();
-    });
-  });
+
   document.querySelectorAll('[data-tnav]').forEach(el => {
     el.addEventListener('click', async () => { 
+       S.prevPage = S.page;
        S.tenderId = el.dataset.tnav; S.page = 'tenders'; 
        await loadTender(S.tenderId); 
        const tabs = detailTabs(S.tender, S.user.role);
-       S.tab = tabs.length > 0 ? tabs[0].k : 'tender_info';
+       S.tab = (S.prevPage === 'billing' && tabs.find(t=>t.k==='billing')) ? 'billing' : (tabs.length > 0 ? tabs[0].k : 'tender_info');
        render(); 
     });
   });
   document.querySelectorAll('[data-lnav]').forEach(el => {
     el.addEventListener('click', async () => { 
+       S.prevPage = S.page;
        S.leadId = el.dataset.lnav; S.page = 'leads'; 
        await loadLead(S.leadId); 
        if (S.leadItem) {
            const tabs = leadTabs(S.leadItem, S.user.role);
-           S.tab = tabs.length > 0 ? tabs[0].k : 'lead_info';
+           S.tab = (S.prevPage === 'billing' && tabs.find(t=>t.k==='billing')) ? 'billing' : (tabs.length > 0 ? tabs[0].k : 'lead_info');
        }
        render(); 
     });
@@ -3332,13 +3329,13 @@ function attachAll() {
 
   $('btnNewTender')?.addEventListener('click', () => openModal('btnNewTender'));
   $('btnNewTenderPage')?.addEventListener('click', () => openModal('btnNewTenderPage'));
-  $('backTenderBtn')?.addEventListener('click', () => { S.tenderId=null; S.tender=null; S.page='dashboard'; render(); });
+  $('backTenderBtn')?.addEventListener('click', () => { S.tenderId=null; S.tender=null; S.page=S.prevPage||'dashboard'; render(); });
 
   // Phase 1: Save draft form (lives on main page, not in a modal)
   
   $('btnNewLead')?.addEventListener('click', () => openModal('btnNewLead'));
   $('btnNewLeadPage')?.addEventListener('click', () => openModal('btnNewLeadPage'));
-  $('backLeadBtn')?.addEventListener('click', () => { S.leadId=null; S.leadItem=null; S.page='dashboard'; render(); });
+  $('backLeadBtn')?.addEventListener('click', () => { S.leadId=null; S.leadItem=null; S.page=S.prevPage||'dashboard'; render(); });
 
   $('ph1LeadForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -3390,7 +3387,7 @@ function attachAll() {
       total_bid_value: $('total_bid_value').value || null, grievance_contact: $('grievance_contact').value,
       link_delivery_address: $('link_delivery_address').value,
       gst_number: $('gst_number')?.value,
-      requirements: { ...(S.tenderItem?.requirements || {}), order_number: $('order_number')?.value }
+      requirements: { ...(S.tender?.requirements || {}), order_number: $('order_number')?.value }
     };
     try { await api('PATCH', `/tenders/${S.tenderId}`, b); await loadTender(S.tenderId); render(); toast('Phase 1 Saved!', 'success'); } catch (ex) { toast(ex.message, 'error'); }
   });
@@ -3417,7 +3414,7 @@ function attachAll() {
   $('btnSubmitProjectPh3')?.addEventListener('click', async () => {
     if (confirm('Submit project to Billing (skip Phase 4)?')) {
       try { 
-        const isLead = S.page === 'lead' || !!S.leadId;
+        const isLead = S.page === 'leads' || !!S.leadId;
         const it = isLead ? S.leadItem : S.tender;
         const endpoint = isLead ? `/leads/${it.id}/move` : `/tenders/${it.id}/move`;
         await api('POST', endpoint, { stage: 'ph5_active' }); 
@@ -3430,8 +3427,47 @@ function attachAll() {
   });
 
   // --- Order Flow Event Handlers ---
+  $('btnSaveSupport')?.addEventListener('click', async () => {
+    const isLead = S.page === 'leads' || !!S.leadId;
+    const it = isLead ? S.leadItem : S.tender;
+    const b = {
+      sup_status: $('sup_status')?.value,
+      sup_desc: $('sup_desc')?.value,
+      sup_sla: $('sup_sla')?.value,
+      sup_rca: $('sup_rca')?.value,
+      sup_kb: $('sup_kb')?.value
+    };
+    try {
+      const endpoint = isLead ? `/leads/${it.id}` : `/tenders/${it.id}`;
+      await api('PATCH', endpoint, b);
+      isLead ? await loadLead(it.id) : await loadTender(it.id);
+      render(); toast('Support Saved!','success');
+    } catch(e) { toast(e.message,'error'); }
+  });
+
+  $('btnSaveInventory')?.addEventListener('click', async () => {
+    const isLead = S.page === 'leads' || !!S.leadId;
+    const it = isLead ? S.leadItem : S.tender;
+    const b = {
+      inv_stock: $('inv_stock')?.value ? parseInt($('inv_stock').value) : null,
+      inv_res: $('inv_res')?.value,
+      inv_serial: $('inv_serial')?.value,
+      inv_cust: $('inv_cust')?.value,
+      inv_in: $('inv_in')?.value,
+      inv_out: $('inv_out')?.value,
+      inv_rma: $('inv_rma')?.value,
+      inv_audit: $('inv_audit')?.value
+    };
+    try {
+      const endpoint = isLead ? `/leads/${it.id}` : `/tenders/${it.id}`;
+      await api('PATCH', endpoint, b);
+      isLead ? await loadLead(it.id) : await loadTender(it.id);
+      render(); toast('Inventory Saved!','success');
+    } catch(e) { toast(e.message,'error'); }
+  });
+
   $('btnSaveProjectInst')?.addEventListener('click', async () => {
-    const isLead = S.page === 'lead' || !!S.leadId;
+    const isLead = S.page === 'leads' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
     const d = it.data || {};
     const b = {
@@ -3454,21 +3490,44 @@ function attachAll() {
     } catch(e) { toast(e.message,'error'); }
   });
 
+  $('btnSaveProcurement')?.addEventListener('click', async () => {
+    const isLead = S.page === 'leads' || !!S.leadId;
+    const it = isLead ? S.leadItem : S.tender;
+    const d = it.data || {};
+    const b = {
+      ...d,
+      pr_req: $('pr_req')?.value,
+      pr_rfq: $('pr_rfq')?.value,
+      pr_vq: $('pr_vq')?.value,
+      pr_po: $('pr_po')?.value,
+      pr_grn: $('pr_grn')?.value,
+      pr_bill: $('pr_bill')?.value
+    };
+    try {
+      const endpoint = isLead ? `/leads/${it.id}` : `/tenders/${it.id}`;
+      await api('PATCH', endpoint, { data: b });
+      isLead ? await loadLead(it.id) : await loadTender(it.id);
+      render(); toast('Procurement Saved!','success');
+    } catch(e) { toast(e.message,'error'); }
+  });
+
   $('btnSaveOrderHeader')?.addEventListener('click', async () => {
-    const isLead = S.page === 'lead' || !!S.leadId;
+    const isLead = S.page === 'leads' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
     const d = it.data || {};
     const b = {
       customer_name: $('ord_cust')?.value,
       delivery_address: $('ord_addr')?.value
     };
-    if (!isLead) b.order_number = $('ord_num')?.value;
+    const reqs = it.requirements || {};
+    reqs.order_number = $('ord_num')?.value;
     try {
       if (isLead) {
-        await api('PATCH', `/leads/${it.id}`, { data: { ...d, ...b } });
+        await api('PATCH', `/leads/${it.id}`, { data: { ...d, ...b }, requirements: reqs });
         await loadLead(it.id);
       } else {
-        await api('PATCH', `/tenders/${it.id}`, { data: { ...d, ...b } });
+        b.order_number = $('ord_num')?.value;
+        await api('PATCH', `/tenders/${it.id}`, { data: { ...d, ...b }, requirements: reqs });
         await loadTender(it.id);
       }
       render(); toast('Header Saved!','success');
@@ -3478,7 +3537,7 @@ function attachAll() {
   $('btnAddOrderCol')?.addEventListener('click', async () => {
     const colName = prompt('Enter new column name:');
     if (!colName) return;
-    const isLead = S.page === 'lead' || !!S.leadId;
+    const isLead = S.page === 'leads' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
     const d = it.data || {};
     const items = d.items || [];
@@ -3502,7 +3561,7 @@ function attachAll() {
   });
 
   $('btnAddOrderRow')?.addEventListener('click', async () => {
-    const isLead = S.page === 'lead' || !!S.leadId;
+    const isLead = S.page === 'leads' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
     const d = it.data || {};
     const items = d.items || [];
@@ -3525,7 +3584,7 @@ function attachAll() {
 
   document.querySelectorAll('.del-row-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
-      const isLead = S.page === 'lead' || !!S.leadId;
+      const isLead = S.page === 'leads' || !!S.leadId;
       const it = isLead ? S.leadItem : S.tender;
       const d = it.data || {};
       const items = d.items || [];
@@ -3549,7 +3608,7 @@ function attachAll() {
   });
 
   $('btnSaveOrderItems')?.addEventListener('click', async () => {
-    const isLead = S.page === 'lead' || !!S.leadId;
+    const isLead = S.page === 'leads' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
     const d = it.data || {};
     const items = d.items || [];
@@ -3571,7 +3630,7 @@ function attachAll() {
 
   $('btnFinaliseOrder')?.addEventListener('click', async () => {
     if (!confirm('Finalise order? This will skip to Phase 5 (Billing).')) return;
-    const isLead = S.page === 'lead' || !!S.leadId;
+    const isLead = S.page === 'leads' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
     try {
       const endpoint = isLead ? `/leads/${it.id}/move` : `/tenders/${it.id}/move`;
@@ -3584,7 +3643,7 @@ function attachAll() {
   const orderDocInput = $('orderDocsInput');
   if (orderDocInput) {
     orderDocInput.addEventListener('change', async () => {
-       const isLead = S.page === 'lead' || !!S.leadId;
+       const isLead = S.page === 'leads' || !!S.leadId;
        const it = isLead ? S.leadItem : S.tender;
        if (!orderDocInput.files.length) return;
        for (let i=0; i<orderDocInput.files.length; i++) {
@@ -3603,7 +3662,7 @@ function attachAll() {
   document.querySelectorAll('.del-doc-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
        if(!confirm('Delete this document?')) return;
-       const isLead = S.page === 'lead' || !!S.leadId;
+       const isLead = S.page === 'leads' || !!S.leadId;
        const it = isLead ? S.leadItem : S.tender;
        const docId = e.target.dataset.id;
        try {
@@ -3617,7 +3676,7 @@ function attachAll() {
   });
 
   $('btnExportOrderExcel')?.addEventListener('click', () => {
-    const isLead = S.page === 'lead' || !!S.leadId;
+    const isLead = S.page === 'leads' || !!S.leadId;
     const it = isLead ? S.leadItem : S.tender;
     const d = it.data || {};
     const items = d.items || [];
@@ -3652,7 +3711,8 @@ window.createUser = async function() {
     name: $('nu-name')?.value,
     email: $('nu-email')?.value,
     password: $('nu-pass')?.value,
-    role: $('nu-role')?.value
+    role: $('nu-role')?.value,
+    workspace_id: S.workspaceId
   };
   if (!body.name || !body.email || !body.password) return toast('Name, email, and password are required', 'error');
   try {
@@ -3668,7 +3728,7 @@ window.createUser = async function() {
 window.toggleUserStatus = async function(userId, currentStatus) {
   const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
   try {
-    await sbClient.from('users').update({ status: newStatus }).eq('id', userId);
+    await api('PATCH', `/users/${userId}`, { status: newStatus, workspace_id: S.workspaceId });
     await loadUsers();
     render();
     toast('User status updated', 'success');

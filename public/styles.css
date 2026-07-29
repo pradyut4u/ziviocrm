@@ -1171,3 +1171,55 @@ tbody tr{transition:background .1s;cursor:default}
 
 /* ---------- Empty states ---------- */
 .ad2-empty { padding: 24px; text-align: center; color: var(--text3); font-size: 12.5px; }
+
+/* Custom Toggle Switch */
+.custom-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 12px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  transition: border-color 0.2s, background 0.2s;
+}
+.custom-toggle:hover {
+  border-color: var(--purple);
+}
+.custom-toggle input {
+  display: none;
+}
+.custom-toggle .toggle-track {
+  width: 40px;
+  height: 24px;
+  background: var(--border);
+  border-radius: 12px;
+  position: relative;
+  transition: background 0.3s;
+}
+.custom-toggle .toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.custom-toggle input:checked + .toggle-track {
+  background: var(--purple);
+}
+.custom-toggle input:checked + .toggle-track::after {
+  transform: translateX(16px);
+}
+.custom-toggle .toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  user-select: none;
+}
+
