@@ -141,7 +141,7 @@ async function notify(userId, title, message, type = 'info', linkId = null) {
 async function notifyRole(roleName, title, message, type = 'info', linkId = null) {
   const { data: users } = await sbClient.from('users').select('*').eq('role', roleName).eq('status', 'active');
   if (!users) return;
-  const { data: wu } = await sbClient.from('workspace_users').select('user_id').eq('workspace_id', S.workspaceId);
+  const { data: wu } = await sbClient.from('workspace_users').select('user_id')[S.workspaceId ? 'eq' : 'is']('workspace_id', S.workspaceId || null);
   const allowed = wu ? wu.map(w => w.user_id) : [];
   for (const u of users) {
     if (u.role === 'admin' || allowed.includes(u.id)) {
@@ -1595,7 +1595,7 @@ async function openManageAccess(wsId) {
   
   try {
     if (!S.users || S.users.length === 0) await loadUsers();
-    const { data, error } = await sbClient.from('workspace_users').select('user_id').eq('workspace_id', wsId);
+    const { data, error } = await sbClient.from('workspace_users').select('user_id')[wsId ? 'eq' : 'is']('workspace_id', wsId || null);
     if (error) throw error;
     S.managingWorkspaceUsers = data ? data.map(d => d.user_id) : [];
     renderManageAccessModal();
