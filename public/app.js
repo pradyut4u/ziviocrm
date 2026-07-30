@@ -1143,9 +1143,22 @@ function renderAnalytics() {
 
   const allItems = [...filteredTenders, ...filteredLeads];
 
+  const getVal = (t) => {
+    if (t.data?.category === 'order' && t.data?.items) {
+      return t.data.items.reduce((sum, item) => {
+        const qty = parseFloat(item['Qty']) || 0;
+        const price = parseFloat(item['Price (₹)']) || 0;
+        const gst = parseFloat(item['GST %']) || 0;
+        return sum + (qty * price * (1 + (gst/100)));
+      }, 0);
+    }
+    return parseFloat(t.quoted_bid_value || t.total_bid_value || 0);
+  };
+
   allItems.forEach(t => {
-    revenue += parseFloat(t.quoted_bid_value || 0);
-    if (t.stage === 'ph5_active') pendingBilling += parseFloat(t.quoted_bid_value || 0);
+    const v = getVal(t);
+    revenue += v;
+    if (t.stage === 'ph5_active') pendingBilling += v;
     if (['ph4_active', 'ph4_complete', 'ph5_active'].includes(t.stage)) activeProjects++;
 
     if (t.payment_cycles) {
@@ -1225,7 +1238,7 @@ function renderAnalytics() {
   const srvMap = {};
   allItems.forEach(t => {
     const s = t.service_type || 'Other';
-    srvMap[s] = (srvMap[s] || 0) + parseFloat(t.quoted_bid_value || 0);
+    srvMap[s] = (srvMap[s] || 0) + getVal(t);
   });
   data.revenueByService = Object.entries(srvMap).sort((a,b)=>b[1]-a[1]).map(e => ({ label: e[0], value: e[1] }));
 
@@ -1249,8 +1262,9 @@ function renderAnalytics() {
   }
   allItems.forEach(t => {
     const m = new Date(t.created_at).toLocaleString('en-US', {month:'short'});
-    if (revMap[m] !== undefined && t.quoted_bid_value) {
-      revMap[m] += parseFloat(t.quoted_bid_value);
+    const v = getVal(t);
+    if (revMap[m] !== undefined && v > 0) {
+      revMap[m] += v;
     }
   });
   data.monthlyRevenue = Object.entries(revMap).map(e => ({ label: e[0], value: e[1] }));
