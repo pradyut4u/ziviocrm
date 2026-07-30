@@ -1879,7 +1879,7 @@ function TabOrderDetails(t, role, isLead) {
         <h3 style="margin-bottom:4px">Finalise Order</h3>
         <div style="color:var(--text2);font-size:13px;">Skip to Phase 5 (Billing & Accounts)</div>
       </div>
-      <button class="btn btn-primary" id="btnFinaliseOrder" style="background:var(--primary);font-size:14px;padding:8px 16px;">Finalise Order →</button>
+      <button class="btn btn-primary" id="btnFinaliseOrder" style="background:#3b82f6;color:white;font-size:14px;padding:8px 16px;border:none;border-radius:6px;cursor:pointer;">Finalise Order →</button>
     </div>
   </div>` : ''}
   `;

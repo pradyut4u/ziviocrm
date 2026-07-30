@@ -82,9 +82,6 @@ async function main() {
             const gst = parseFloat(gstRaw) || 0;
             const total = parseFloat(totalRaw) || 0;
 
-            let mbpsRaw = row['Mbps Qty'] ? row['Mbps Qty'].toString().replace(/[^0-9.]/g, '') : null;
-            let mbps = mbpsRaw ? parseFloat(mbpsRaw) : null;
-
             const leadId = randomUUID();
             
             // Map according to the Supabase leads schema
@@ -95,26 +92,23 @@ async function main() {
                 est_bid_value: baseVal,
                 total_bid_value: total,
                 gst: baseVal > 0 ? (gst / baseVal * 100) : 18,
-                bandwidth_mbps: mbps,
-                stage: 'ph5_active', // Billing Phase
+                stage: 'ph1_draft', // New Orders
                 created_by: defaultUserId,
-                workspace_id: 'f4afb318-a978-4ff7-942a-fad41409c06f'
+                workspace_id: 'f4afb318-a978-4ff7-942a-fad41409c06f',
+                data: {
+                    category: 'order',
+                    items: [
+                        {
+                            'Product Name': 'Bandwidth',
+                            'Qty': '1',
+                            'Price (₹)': baseVal,
+                            'GST %':'18'
+                        }
+                    ]
+                }
             };
 
             leadsToInsert.push(lead);
-
-            // Phase 5 requires invoices
-            invoicesToInsert.push({
-                id: randomUUID(),
-                lead_id: leadId,
-                invoice_number: row['Invoice no'] || `INV-DAIC-${sn}`,
-                base_price: baseVal,
-                gst_pct: lead.gst,
-                invoice_value: total,
-                created_by: defaultUserId,
-                workspace_id: 'f4afb318-a978-4ff7-942a-fad41409c06f'
-            });
-
             count++;
         }
 
@@ -124,12 +118,7 @@ async function main() {
             await request('POST', '/rest/v1/leads', leadsToInsert.slice(i, i + 10));
         }
 
-        console.log(`Inserting ${invoicesToInsert.length} invoices into Supabase...`);
-        for (let i = 0; i < invoicesToInsert.length; i += 10) {
-            await request('POST', '/rest/v1/lead_invoices', invoicesToInsert.slice(i, i + 10));
-        }
-
-        console.log(`Successfully pushed ${count} leads and invoices to Supabase!`);
+        console.log(`Successfully pushed ${count} leads to Supabase!`);
 
     } catch (e) {
         console.error("Error:", e);
