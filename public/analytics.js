@@ -30,9 +30,10 @@ const ICONS = {
   customer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
 };
 
-function kpiCard({ label, value, changePct, iconKey, iconClass, isMoney }) {
+function kpiCard({ label, value, changePct, iconKey, iconClass, isMoney, navHash }) {
+  const clickAttr = navHash ? `onclick="window.location.hash='${navHash}'" style="cursor: pointer;"` : '';
   return `
-    <div class="ad2-card ad2-kpi-card">
+    <div class="ad2-card ad2-kpi-card" ${clickAttr}>
       <div class="ad2-kpi-top">
         <div class="ad2-kpi-icon ${iconClass}">${ICONS[iconKey] || ''}</div>
         ${trendChip(changePct)}
@@ -244,8 +245,8 @@ function renderAnalyticsDashboard(data) {
     </div>
 
     <div class="ad2-kpi-grid">
-      ${kpiCard({ label: 'Total Leads', value: kpis.totalLeads?.value, changePct: kpis.totalLeads?.changePct, iconKey: 'leads', iconClass: 'ad2-icon-blue' })}
-      ${kpiCard({ label: 'Live Tenders', value: kpis.liveTenders?.value, changePct: kpis.liveTenders?.changePct, iconKey: 'tenders', iconClass: 'ad2-icon-purple' })}
+      ${kpiCard({ label: 'Total Leads', value: kpis.totalLeads?.value, changePct: kpis.totalLeads?.changePct, iconKey: 'leads', iconClass: 'ad2-icon-blue', navHash: '#leads' })}
+      ${kpiCard({ label: 'Live Tenders', value: kpis.liveTenders?.value, changePct: kpis.liveTenders?.changePct, iconKey: 'tenders', iconClass: 'ad2-icon-purple', navHash: '#tenders' })}
       ${kpiCard({ label: 'Awarded', value: kpis.awarded?.value, changePct: kpis.awarded?.changePct, iconKey: 'awarded', iconClass: 'ad2-icon-green' })}
       ${kpiCard({ label: 'Active Projects', value: kpis.activeProjects?.value, changePct: kpis.activeProjects?.changePct, iconKey: 'projects', iconClass: 'ad2-icon-cyan' })}
       ${kpiCard({ label: 'Total Revenue', value: kpis.revenue?.value, changePct: kpis.revenue?.changePct, iconKey: 'revenue', iconClass: 'ad2-icon-green', isMoney: true })}
