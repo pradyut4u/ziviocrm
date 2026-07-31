@@ -1170,8 +1170,10 @@ function renderAnalytics() {
 
   allItems.forEach(t => {
     const v = getVal(t);
-    revenue += v;
-    if (t.stage === 'ph5_active') pendingBilling += v;
+    if (t.stage === 'ph5_active') {
+      revenue += v;
+      pendingBilling += v;
+    }
     if (['ph4_active', 'ph4_complete', 'ph5_active'].includes(t.stage)) activeProjects++;
 
     if (t.payment_cycles) {
