@@ -1790,7 +1790,7 @@ function TabOrderDetails(t, role, isLead) {
   const items = d.items || [];
   const customCols = d.custom_columns || [];
   
-  const baseCols = ['Product Name', 'Qty', 'Price (₹)', 'GST %', 'Amount (₹)', 'Link', 'Description', 'Source of Purchase'];
+  const baseCols = ['Product Name', 'Qty', 'Price (₹)', 'GST %', 'Amount (₹)', 'Period', 'Link', 'Description', 'Source of Purchase'];
   const allCols = [...baseCols, ...customCols];
   
   let totalAmt = 0;
@@ -1926,7 +1926,7 @@ function TabProject(t, tab, role) {
   const items = d.items || [];
   const customCols = d.custom_columns || [];
   
-  const baseCols = ['Product Name', 'Qty', 'Price (₹)', 'GST %', 'Amount (₹)', 'Link', 'Description', 'Source of Purchase'];
+  const baseCols = ['Product Name', 'Qty', 'Price (₹)', 'GST %', 'Amount (₹)', 'Period', 'Link', 'Description', 'Source of Purchase'];
   const allCols = [...baseCols, ...customCols];
   
   let totalAmt = 0;
