@@ -130,7 +130,7 @@ function getPrefix(path) {
 }
 
 function getVal(t) {
-  if (t.data?.category === 'order' && t.data?.items) {
+  if ((t.data?.category === 'order' || t.data?.category === 'project') && t.data?.items) {
     return t.data.items.reduce((sum, item) => {
       const qty = parseFloat(item['Qty']) || 0;
       const price = parseFloat(item['Price (₹)']) || 0;
@@ -1027,7 +1027,7 @@ function PageDashboard() {
                     <td>${esc(acc.requirements?.order_number || '-')}</td>
                     <td style="font-weight:600">${esc(acc.org_name || '-')}</td>
                     <td>${esc(acc.link_delivery_address || '-')}</td>
-                    ${isTech ? `<td>${esc(acc.service_type || '-')}</td>` : `<td style="font-weight:600">${fmt(acc.quoted_bid_value, 'currency')}</td>`}
+                    ${isTech ? `<td>${esc(acc.service_type || '-')}</td>` : `<td style="font-weight:600">${fmt(getVal(acc), 'currency')}</td>`}
                     <td>${esc(acc.contract_period || '-')}</td>
                     <td>${acc.bandwidth_mbps ? acc.bandwidth_mbps + ' Mbps' : '-'}</td>
                     ${showCircuit ? `<td>${(acc.circuits||[]).map(c=>`<span class="badge" style="background:var(--blue);color:#fff;margin-right:4px">${esc(c.circuit_id)}</span>`).join('') || '-'}</td>` : ''}
@@ -1084,7 +1084,7 @@ function PageDashboard() {
                     <td>${esc(acc.requirements?.order_number || '-')}</td>
                     <td style="font-weight:600">${esc(acc.org_name || '-')}</td>
                     <td>${esc(acc.link_delivery_address || '-')}</td>
-                    ${isTech ? `<td>${esc(acc.service_type || '-')}</td>` : `<td style="font-weight:600">${fmt(acc.quoted_bid_value, 'currency')}</td>`}
+                    ${isTech ? `<td>${esc(acc.service_type || '-')}</td>` : `<td style="font-weight:600">${fmt(getVal(acc), 'currency')}</td>`}
                     <td>${esc(acc.contract_period || '-')}</td>
                     <td>${acc.bandwidth_mbps ? acc.bandwidth_mbps + ' Mbps' : '-'}</td>
                     ${showCircuit ? `<td>${(acc.circuits||[]).map(c=>`<span class="badge" style="background:var(--blue);color:#fff;margin-right:4px">${esc(c.circuit_id)}</span>`).join('') || '-'}</td>` : ''}
