@@ -145,7 +145,7 @@ function getVal(t) {
     }, 0);
     if (sum > 0) return sum;
   }
-  return parseFloat(t.quoted_bid_value || t.total_bid_value || 0);
+  return parseFloat(t.quoted_bid_value || t.total_bid_value || t.value || t.est_bid_value || 0);
 }
 
 function getPeriod(t) {
