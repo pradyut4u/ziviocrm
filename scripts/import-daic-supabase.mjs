@@ -92,17 +92,18 @@ async function main() {
                 est_bid_value: baseVal,
                 total_bid_value: total,
                 gst: baseVal > 0 ? (gst / baseVal * 100) : 18,
-                stage: 'ph1_draft', // New Orders
+                stage: 'ph5_active', // New Orders
                 created_by: defaultUserId,
                 workspace_id: 'f4afb318-a978-4ff7-942a-fad41409c06f',
                 data: {
-                    category: 'order',
+                    category: 'project',
                     items: [
                         {
                             'Product Name': 'Bandwidth',
                             'Qty': '1',
                             'Price (₹)': baseVal,
-                            'GST %':'18'
+                            'GST %':'18',
+                            'Period': row['No. of  Days'] ? String(row['No. of  Days']) : ''
                         }
                     ]
                 }

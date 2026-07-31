@@ -141,6 +141,13 @@ function getVal(t) {
   return parseFloat(t.quoted_bid_value || t.total_bid_value || 0);
 }
 
+function getPeriod(t) {
+  if ((t.data?.category === 'order' || t.data?.category === 'project') && t.data?.items && t.data.items.length > 0) {
+    return t.data.items[0]['Period'] || t.contract_period || '-';
+  }
+  return t.contract_period || '-';
+}
+
 async function audit(action, type, id, details = {}) {
   await sbClient.from('audit_logs').insert({ action, entity_type: type, entity_id: id, user_id: S.user.id, details, workspace_id: S.workspaceId });
 }
@@ -1028,7 +1035,7 @@ function PageDashboard() {
                     <td style="font-weight:600">${esc(acc.org_name || '-')}</td>
                     <td>${esc(acc.link_delivery_address || '-')}</td>
                     ${isTech ? `<td>${esc(acc.service_type || '-')}</td>` : `<td style="font-weight:600">${fmt(getVal(acc), 'currency')}</td>`}
-                    <td>${esc(acc.contract_period || '-')}</td>
+                    <td>${esc(getPeriod(acc))}</td>
                     <td>${acc.bandwidth_mbps ? acc.bandwidth_mbps + ' Mbps' : '-'}</td>
                     ${showCircuit ? `<td>${(acc.circuits||[]).map(c=>`<span class="badge" style="background:var(--blue);color:#fff;margin-right:4px">${esc(c.circuit_id)}</span>`).join('') || '-'}</td>` : ''}
                     <td>${stageBadge(acc.stage)} ${alert ? `<button class="alert-silence-btn" data-silence="${acc.id}" title="Silence Alert">ðŸ”•</button>` : ''}</td>
@@ -1085,7 +1092,7 @@ function PageDashboard() {
                     <td style="font-weight:600">${esc(acc.org_name || '-')}</td>
                     <td>${esc(acc.link_delivery_address || '-')}</td>
                     ${isTech ? `<td>${esc(acc.service_type || '-')}</td>` : `<td style="font-weight:600">${fmt(getVal(acc), 'currency')}</td>`}
-                    <td>${esc(acc.contract_period || '-')}</td>
+                    <td>${esc(getPeriod(acc))}</td>
                     <td>${acc.bandwidth_mbps ? acc.bandwidth_mbps + ' Mbps' : '-'}</td>
                     ${showCircuit ? `<td>${(acc.circuits||[]).map(c=>`<span class="badge" style="background:var(--blue);color:#fff;margin-right:4px">${esc(c.circuit_id)}</span>`).join('') || '-'}</td>` : ''}
                     <td>${stageBadge(acc.stage)} ${alert ? `<button class="alert-silence-btn" data-silence="${acc.id}" title="Silence Alert">ðŸ”•</button>` : ''}</td>
@@ -1383,7 +1390,7 @@ function PageTechnical() {
             <td style="font-weight:600">${esc(t.org_name||'-')}</td>
             <td>${esc(t.link_delivery_address||'-')}</td>
             <td>${esc(t.service_type||'-')}</td>
-            <td>${esc(t.contract_period||'-')}</td>
+            <td>${esc(getPeriod(t))}</td>
             <td>${t.bandwidth_mbps ? t.bandwidth_mbps + ' Mbps' : '-'}</td>
             <td>${(t.circuits||[]).map(c=>`<span class="badge" style="background:var(--blue);color:#fff;margin-right:4px">${esc(c.circuit_id)}</span>`).join('') || '-'}</td>
             <td>${stageBadge(t.stage)}</td>
@@ -1415,7 +1422,7 @@ function PageTechnical() {
             <td style="font-weight:600">${esc(t.org_name||'-')}</td>
             <td>${esc(t.link_delivery_address||'-')}</td>
             <td>${esc(t.service_type||'-')}</td>
-            <td>${esc(t.contract_period||'-')}</td>
+            <td>${esc(getPeriod(t))}</td>
             <td>${t.bandwidth_mbps ? t.bandwidth_mbps + ' Mbps' : '-'}</td>
             <td>${(t.circuits||[]).map(c=>`<span class="badge" style="background:var(--blue);color:#fff;margin-right:4px">${esc(c.circuit_id)}</span>`).join('') || '-'}</td>
             <td>${stageBadge(t.stage)}</td>
