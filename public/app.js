@@ -126,8 +126,19 @@ const SUPABASE_KEY = 'sb_publishable_xRkLpc7cvht6D3UugO4TIQ_DKYZm1_d';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function getPrefix(path) {
-  if (path.startsWith('/leads')) return 'lead';
-  return 'tender'; // default for tenders
+  return path.split('_')[0];
+}
+
+function getVal(t) {
+  if (t.data?.category === 'order' && t.data?.items) {
+    return t.data.items.reduce((sum, item) => {
+      const qty = parseFloat(item['Qty']) || 0;
+      const price = parseFloat(item['Price (₹)']) || 0;
+      const gst = parseFloat(item['GST %']) || 0;
+      return sum + (qty * price * (1 + (gst/100)));
+    }, 0);
+  }
+  return parseFloat(t.quoted_bid_value || t.total_bid_value || 0);
 }
 
 async function audit(action, type, id, details = {}) {
@@ -1143,18 +1154,6 @@ function renderAnalytics() {
 
   const allItems = [...filteredTenders, ...filteredLeads];
 
-  const getVal = (t) => {
-    if (t.data?.category === 'order' && t.data?.items) {
-      return t.data.items.reduce((sum, item) => {
-        const qty = parseFloat(item['Qty']) || 0;
-        const price = parseFloat(item['Price (₹)']) || 0;
-        const gst = parseFloat(item['GST %']) || 0;
-        return sum + (qty * price * (1 + (gst/100)));
-      }, 0);
-    }
-    return parseFloat(t.quoted_bid_value || t.total_bid_value || 0);
-  };
-
   allItems.forEach(t => {
     const v = getVal(t);
     revenue += v;
@@ -1341,7 +1340,7 @@ function PageTenders() {
             <td>${esc(t.requirements?.order_number || '-')}</td>
             <td><div class="tbl-link">${esc(t.title)}</div></td>
             <td>${esc(t.org_name||'—')}</td><td>${stageBadge(t.stage)}</td>
-            <td style="font-weight:700">${fmt(t.quoted_bid_value,'currency')}</td>
+            <td style="font-weight:700">${fmt(getVal(t),'currency')}</td>
             <td>${fmt(t.bid_end_datetime,'date')}</td>
           </tr>`).join('')}
         </tbody>
@@ -2332,7 +2331,7 @@ function PageLeads() {
             <td>${esc(t.requirements?.order_number || '-')}</td>
             <td><div class="tbl-link">${esc(t.title)}</div></td>
             <td>${esc(t.org_name||'—')}</td><td>${stageBadge(t.stage)}</td>
-            <td style="font-weight:700">${fmt(t.quoted_bid_value,'currency')}</td>
+            <td style="font-weight:700">${fmt(getVal(t),'currency')}</td>
             <td>${fmt(t.bid_end_datetime,'date')}</td>
           </tr>`).join('')}
         </tbody>
