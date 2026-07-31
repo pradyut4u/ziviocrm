@@ -131,12 +131,19 @@ function getPrefix(path) {
 
 function getVal(t) {
   if ((t.data?.category === 'order' || t.data?.category === 'project') && t.data?.items) {
-    return t.data.items.reduce((sum, item) => {
-      const qty = parseFloat(item['Qty']) || 0;
+    const sum = t.data.items.reduce((s, item) => {
+      const qty = parseFloat(item['Qty']) || 1;
       const price = parseFloat(item['Price (₹)']) || 0;
+      const amt = parseFloat(item['Amount (₹)']) || 0;
       const gst = parseFloat(item['GST %']) || 0;
-      return sum + (qty * price * (1 + (gst/100)));
+      
+      let itemTotal = amt;
+      if (itemTotal === 0 && price > 0) {
+        itemTotal = qty * price * (1 + (gst/100));
+      }
+      return s + itemTotal;
     }, 0);
+    if (sum > 0) return sum;
   }
   return parseFloat(t.quoted_bid_value || t.total_bid_value || 0);
 }
