@@ -94,18 +94,18 @@ function timeAgo(d) {
 function fileIcon(mime) {
   if (!mime) return '📎'; mime = String(mime).toLowerCase();
   if (mime.includes('pdf')) return '📄';
-  if (mime.includes('word')||mime.includes('doc')) return 'ðŸ“';
+  if (mime.includes('word')||mime.includes('doc')) return '📝';
   if (mime.includes('excel')||mime.includes('sheet')||mime.includes('xls')) return '📊';
-  if (mime.includes('image')) return 'ðŸ–¼ï¸'; return '📎';
+  if (mime.includes('image')) return '🖼️'; return '📎';
 }
 
 function stageBadge(stage) {
   const m = {
-    ph1_draft:['b-gray','○ Ph1 Draft'], ph1_complete:['b-blue','â— Ph1 Complete'],
+    ph1_draft:['b-gray','○ Ph1 Draft'], ph1_complete:['b-blue','● Ph1 Complete'],
     ph2_active:['b-purple','⚙ Ph2 Active'], ph2_complete:['b-cyan','✓ Ph2 Complete'],
     ph3_active:['b-amber','⚖ Ph3 Awarding'], ph3_awarded:['b-green','✓ Ph3 Awarded'], ph3_disqualified:['b-red','⨯ Ph3 Disqualified'],
     ph4_active:['b-blue','🚚 Ph4 Delivery'], ph4_complete:['b-cyan','✓ Ph4 Complete'],
-    ph5_active:['b-amber','₹ Ph5 Billing'], closed:['b-green','â— Closed']
+    ph5_active:['b-amber','₹ Ph5 Billing'], closed:['b-green','● Closed']
   }[stage] || ['b-gray', stage];
   return `<span class="badge ${m[0]}">${m[1]}</span>`;
 }
@@ -1045,7 +1045,7 @@ function PageDashboard() {
                     <td>${esc(getPeriod(acc))}</td>
                     <td>${acc.bandwidth_mbps ? acc.bandwidth_mbps + ' Mbps' : '-'}</td>
                     ${showCircuit ? `<td>${(acc.circuits||[]).map(c=>`<span class="badge" style="background:var(--blue);color:#fff;margin-right:4px">${esc(c.circuit_id)}</span>`).join('') || '-'}</td>` : ''}
-                    <td>${stageBadge(acc.stage)} ${alert ? `<button class="alert-silence-btn" data-silence="${acc.id}" title="Silence Alert">ðŸ”•</button>` : ''}</td>
+                    <td>${stageBadge(acc.stage)} ${alert ? `<button class="alert-silence-btn" data-silence="${acc.id}" title="Silence Alert">🔕</button>` : ''}</td>
                   </tr>
                 `}).join('')}
               </tbody>
@@ -1102,7 +1102,7 @@ function PageDashboard() {
                     <td>${esc(getPeriod(acc))}</td>
                     <td>${acc.bandwidth_mbps ? acc.bandwidth_mbps + ' Mbps' : '-'}</td>
                     ${showCircuit ? `<td>${(acc.circuits||[]).map(c=>`<span class="badge" style="background:var(--blue);color:#fff;margin-right:4px">${esc(c.circuit_id)}</span>`).join('') || '-'}</td>` : ''}
-                    <td>${stageBadge(acc.stage)} ${alert ? `<button class="alert-silence-btn" data-silence="${acc.id}" title="Silence Alert">ðŸ”•</button>` : ''}</td>
+                    <td>${stageBadge(acc.stage)} ${alert ? `<button class="alert-silence-btn" data-silence="${acc.id}" title="Silence Alert">🔕</button>` : ''}</td>
                   </tr>
                 `}).join('')}
               </tbody>
@@ -1252,6 +1252,7 @@ function renderAnalytics() {
   // Revenue by Service Type
   const srvMap = {};
   allItems.forEach(t => {
+    if (t.stage !== 'ph5_active') return;
     const s = t.service_type || 'Other';
     srvMap[s] = (srvMap[s] || 0) + getVal(t);
   });
@@ -1276,6 +1277,7 @@ function renderAnalytics() {
     revMap[d.toLocaleString('en-US', {month:'short'})] = 0;
   }
   allItems.forEach(t => {
+    if (t.stage !== 'ph5_active') return;
     const m = new Date(t.created_at).toLocaleString('en-US', {month:'short'});
     const v = getVal(t);
     if (revMap[m] !== undefined && v > 0) {
