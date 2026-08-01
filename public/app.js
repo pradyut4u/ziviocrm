@@ -2302,10 +2302,11 @@ function TabBilling(t, role) {
          <div>Balance: <span style="color:var(--red)">₹${bal.toLocaleString('en-IN')}</span></div>
       </div>
       <div class="table-wrap"><table>
-         <thead><tr><th>Cycle</th><th>Period</th><th>Due</th><th>Status</th><th>Received</th><th>Pay Date</th>${edit?'<th>Act</th>':''}</tr></thead>
+         <thead><tr><th>Cycle</th><th>Invoice</th><th>Period</th><th>Due</th><th>Status</th><th>Received</th><th>Pay Date</th>${edit?'<th>Act</th>':''}</tr></thead>
          <tbody>${cycs.map(c=>`
             <tr>
                <td>#${c.cycle_number}</td>
+               <td>${c.invoice_number||'-'}${c.invoice_doc_url ? ` <a href="${c.invoice_doc_url}" target="_blank" title="View Invoice">📄</a>` : ''}</td>
                <td>${fmt(c.period_from,'date')} - ${fmt(c.period_to,'date')}</td>
                <td>${fmt(c.amount_due,'currency')}</td>
                <td><span class="badge ${c.payment_status==='Paid'?'b-green':c.payment_status==='Partial'?'b-amber':'b-gray'}">${c.payment_status}</span></td>
@@ -2314,7 +2315,7 @@ function TabBilling(t, role) {
                ${edit?`<td><button class="btn btn-ghost btn-sm" onclick="editCycle('${c.id}')">Edit</button></td>`:''}
             </tr>
          `).join('')}
-         ${!cycs.length?`<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text3)">No payment cycles yet</td></tr>`:''}
+         ${!cycs.length?`<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text3)">No payment cycles yet</td></tr>`:''}
          </tbody>
       </table></div>
     `;
@@ -2718,10 +2719,11 @@ function TabLeadBilling(t, role) {
          <div>Balance: <span style="color:var(--red)">₹${bal.toLocaleString('en-IN')}</span></div>
       </div>
       <div class="table-wrap"><table>
-         <thead><tr><th>Cycle</th><th>Period</th><th>Due</th><th>Status</th><th>Received</th><th>Pay Date</th>${edit?'<th>Act</th>':''}</tr></thead>
+         <thead><tr><th>Cycle</th><th>Invoice</th><th>Period</th><th>Due</th><th>Status</th><th>Received</th><th>Pay Date</th>${edit?'<th>Act</th>':''}</tr></thead>
          <tbody>${cycs.map(c=>`
             <tr>
                <td>#${c.cycle_number}</td>
+               <td>${c.invoice_number||'-'}${c.invoice_doc_url ? ` <a href="${c.invoice_doc_url}" target="_blank" title="View Invoice">📄</a>` : ''}</td>
                <td>${fmt(c.period_from,'date')} - ${fmt(c.period_to,'date')}</td>
                <td>${fmt(c.amount_due,'currency')}</td>
                <td><span class="badge ${c.payment_status==='Paid'?'b-green':c.payment_status==='Partial'?'b-amber':'b-gray'}">${c.payment_status}</span></td>
@@ -2730,7 +2732,7 @@ function TabLeadBilling(t, role) {
                ${edit?`<td><button class="btn btn-ghost btn-sm" onclick="editCycle('${c.id}')">Edit</button></td>`:''}
             </tr>
          `).join('')}
-         ${!cycs.length?`<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text3)">No payment cycles yet</td></tr>`:''}
+         ${!cycs.length?`<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text3)">No payment cycles yet</td></tr>`:''}
          </tbody>
       </table></div>
     `;
@@ -2892,16 +2894,19 @@ function attachModalHandlers() {
      const cid = $('mc_id')?.value;
      const source = S.leadId ? S.leadItem : S.tender;
      const cycs = source?.payment_cycles || [];
-     const b = {
-        cycle_number: $('mc_cn')?.value || (cid ? undefined : cycs.length + 1),
-        period_from: $('mc_pf').value, period_to: $('mc_pt').value, amount_due: $('mc_ad').value,
-        payment_status: $('mc_ps').value, amount_received: $('mc_ar').value, payment_date: $('mc_pd').value
-     };
+     
+     const fd = new FormData();
+     if(!cid) fd.append('cycle_number', cycs.length + 1);
+     fd.append('period_from', $('mc_pf').value); fd.append('period_to', $('mc_pt').value); fd.append('amount_due', $('mc_ad').value);
+     fd.append('payment_status', $('mc_ps').value); fd.append('amount_received', $('mc_ar').value); fd.append('payment_date', $('mc_pd').value);
+     if($('mc_in')?.value) fd.append('invoice_number', $('mc_in').value);
+     if($('mc_doc')?.files[0]) fd.append('invoice_doc', $('mc_doc').files[0]);
+     
      const id = S.leadId || S.tenderId;
      const base = S.leadId ? 'leads' : 'tenders';
      try {
-         if(cid) await api('PATCH',`/${base}/${id}/payment-cycles/${cid}`, b);
-         else await api('POST',`/${base}/${id}/payment-cycles`, b);
+         if(cid) await up(`/${base}/${id}/payment-cycles/${cid}`, fd);
+         else await up(`/${base}/${id}/payment-cycles`, fd);
          if(S.leadId) await loadLead(id); else await loadTender(id); removeModal(); render(); toast('Cycle saved!','success');
      } catch(e){toast(e.message,'error');}
   });
@@ -2913,9 +2918,10 @@ window.editCycle = (cid) => {
     if(!c) return;
     openModal('ph5-cycle');
     setTimeout(()=>{
-       $('mc_id').value=cid; $('mc_cn').value=c.cycle_number||''; $('mc_pf').value=c.period_from||''; $('mc_pt').value=c.period_to||'';
+       $('mc_id').value=cid; $('mc_pf').value=c.period_from||''; $('mc_pt').value=c.period_to||'';
        $('mc_ad').value=c.amount_due||''; $('mc_ps').value=c.payment_status||'Pending';
        $('mc_ar').value=c.amount_received||''; $('mc_pd').value=c.payment_date||'';
+       if($('mc_in')) $('mc_in').value=c.invoice_number||'';
     },50);
 }
 
@@ -3069,13 +3075,14 @@ function openModal(id) {
     showModal(MW('Payment Cycle', `
       <input type="hidden" id="mc_id">
       <div class="grid g2">
-         ${inputGroup('mc_cn','Cycle Number','','number',true)}
          ${inputGroup('mc_pf','Period From','','date',true)}
          ${inputGroup('mc_pt','Period To','','date',true)}
          ${inputGroup('mc_ad','Amount Due','','number',true)}
          ${inputGroup('mc_ps','Payment Status','Pending','select',true,['Pending','Partial','Paid'])}
          ${inputGroup('mc_ar','Amount Received','','number',true)}
          ${inputGroup('mc_pd','Payment Date','','date',true)}
+         ${inputGroup('mc_in','Invoice Number','','text',true)}
+         <div class="form-group"><label class="form-label">Invoice Doc</label><input type="file" id="mc_doc" class="form-input"></div>
       </div>
     `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="ph5CycBtn">Save Cycle</button>`));
   }
