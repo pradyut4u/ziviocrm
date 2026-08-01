@@ -2273,7 +2273,6 @@ function TabBilling(t, role) {
     const headHtml = !inv.id ? 
       (edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary" data-modal="ph5-invoice">Create Invoice Header</button>` : `<div class="empty"><div class="empty-icon">₹</div><div class="empty-title">Pending Invoice Creation</div></div>`) :
       `<div class="grid g3">
-          ${inputGroup('i_no','Invoice Number',inv.invoice_number)}
           ${inputGroup('i_nt','Notif to Tender Date',inv.notif_to_tender_date)}
           ${inputGroup('i_ad','Award Date',inv.award_date)}
           ${inputGroup('i_tot','Total Contract Price',inv.total_price)}
@@ -2690,7 +2689,6 @@ function TabLeadBilling(t, role) {
     const headHtml = !inv.id ? 
       (edit&&t.stage==='ph5_active' ? `<button class="btn btn-primary" data-modal="ph5-invoice">Create Invoice Header</button>` : `<div class="empty"><div class="empty-icon">₹</div><div class="empty-title">Pending Invoice Creation</div></div>`) :
       `<div class="grid g3">
-          ${inputGroup('i_no','Invoice Number',inv.invoice_number)}
           ${inputGroup('i_nt','Notif to Lead Date',inv.notif_to_lead_date)}
           ${inputGroup('i_ad','Award Date',inv.award_date)}
           ${inputGroup('i_tot','Total Contract Price',inv.total_price)}
@@ -2881,11 +2879,10 @@ function attachModalHandlers() {
 
   $('ph5InvBtn')?.addEventListener('click', async()=>{
      const fd = new FormData();
-     fd.append('invoice_number',$('m5_no').value); fd.append(S.leadId ? 'notif_to_lead_date' : 'notif_to_tender_date',$('m5_nt').value); fd.append('award_date',$('m5_ad').value);
+     fd.append(S.leadId ? 'notif_to_lead_date' : 'notif_to_tender_date',$('m5_nt').value); fd.append('award_date',$('m5_ad').value);
      fd.append('total_price',$('m5_tot').value); fd.append('billing_price',$('m5_bp').value); fd.append('base_price',$('m5_base').value);
      fd.append('gst_pct',$('m5_gst').value); fd.append('duration_from',$('m5_df').value); fd.append('duration_to',$('m5_dt').value);
      fd.append('payment_cycle',$('m5_pc').value);
-     if($('m5_doc').files[0]) fd.append('invoice_upload',$('m5_doc').files[0]);
      const id = S.leadId || S.tenderId;
      const base = S.leadId ? 'leads' : 'tenders';
      try { await up(`/${base}/${id}/phase5`,fd); if(S.leadId) await loadLead(id); else await loadTender(id); removeModal(); render(); toast('Invoice Header Created!','success'); } catch(e){toast(e.message,'error');}
@@ -3055,7 +3052,6 @@ function openModal(id) {
   if (id === 'ph5-invoice') {
     showModal(MW('Phase 5: Invoice Header', `
       <div class="grid g2">
-         ${inputGroup('m5_no','Invoice Number','','text',true)}
          ${inputGroup('m5_nt', S.leadId ? 'Notif to Lead Date' : 'Notif to Tender Date','','date',true)}
          ${inputGroup('m5_ad','Award Date','','date',true)}
          ${inputGroup('m5_tot','Total Contract Price','','number',true)}
@@ -3065,7 +3061,6 @@ function openModal(id) {
          ${inputGroup('m5_df','Duration From','','date',true)}
          ${inputGroup('m5_dt','Duration To','','date',true)}
          ${inputGroup('m5_pc','Payment Cycle','Monthly','select',true,['Monthly','Quarterly','Half-yearly','Annual','One-time'])}
-         <div class="form-group" style="grid-column:1/-1"><label class="form-label">Invoice Upload *</label><input type="file" id="m5_doc" class="form-input"></div>
       </div>
     `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="ph5InvBtn">Save Invoice Header</button>`));
   }
