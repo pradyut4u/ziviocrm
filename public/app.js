@@ -489,6 +489,10 @@ async function up(path, fd) {
   
   if (sub === 'phase5') {
     const invDoc = await uploadFile(fd.get('invoice_upload'));
+    const basePrice = parseFloat(fd.get('base_price') || 0);
+    const gstPct = parseFloat(fd.get('gst_pct') || 0);
+    const invoiceVal = basePrice + (basePrice * (gstPct / 100));
+    
     await sbClient.from(prefix + 'invoices').insert({
       [pId]: id, created_by: S.user.id, workspace_id: S.workspaceId,
       invoice_number: fd.get('invoice_number'),
@@ -496,8 +500,9 @@ async function up(path, fd) {
       award_date: fd.get('award_date'),
       total_price: parseFloat(fd.get('total_price') || 0),
       billing_price: parseFloat(fd.get('billing_price') || 0),
-      base_price: parseFloat(fd.get('base_price') || 0),
-      gst_pct: parseFloat(fd.get('gst_pct') || 0),
+      base_price: basePrice,
+      gst_pct: gstPct,
+      invoice_value: invoiceVal,
       duration_from: fd.get('duration_from'),
       duration_to: fd.get('duration_to'),
       payment_cycle: fd.get('payment_cycle'),
