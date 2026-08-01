@@ -526,7 +526,7 @@ async function handle(req, res) {
     if (!['tender','admin'].includes(user.role)) return jerr(res, 'Forbidden', 403);
     const b = await readJson(req);
     const rec = ins('phase3_records', { tender_id: tid, created_by: user.id, ...b });
-    const newStage = b.qualification_result === 'Awarded' ? 'ph4_active' : 'ph3_disqualified';
+    const newStage = b.qualification_result === 'Awarded' ? 'ph4_active' : (b.qualification_result === 'Qualified' || b.qualification_result === 'Extended' ? 'ph3_active' : 'ph3_disqualified');
     
     if (b.qualification_result === 'Awarded') {
       await generateCircuitIds(1, tid, 'tender');
@@ -857,7 +857,7 @@ async function handle(req, res) {
     if (!['lead','admin'].includes(user.role)) return jerr(res, 'Forbidden', 403);
     const b = await readJson(req);
     const rec = ins('lead_phase3_records', { lead_id: lid, created_by: user.id, ...b });
-    const newStage = b.qualification_result === 'Awarded' ? 'ph4_active' : 'ph3_disqualified';
+    const newStage = b.qualification_result === 'Awarded' ? 'ph4_active' : (b.qualification_result === 'Qualified' || b.qualification_result === 'Extended' ? 'ph3_active' : 'ph3_disqualified');
     
     if (b.qualification_result === 'Awarded') {
       await generateCircuitIds(1, lid, 'lead');

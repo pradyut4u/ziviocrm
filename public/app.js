@@ -2820,7 +2820,8 @@ function attachModalHandlers() {
         award_date: $('m3_ad').value || null, 
         delivery_date: $('m3_dd').value || null, 
         disqualification_reason: $('m3_dr').value || null, 
-        qualification_remarks: $('m3_qr')?.value || null
+        qualification_remarks: $('m3_qr')?.value || null,
+        extended_date: $('m3_ed')?.value || null
      };
      const id = S.leadId || S.tenderId;
      const base = S.leadId ? 'leads' : 'tenders';
@@ -2829,9 +2830,10 @@ function attachModalHandlers() {
 
   $('m3_res')?.addEventListener('change', e=>{
       const v = e.target.value;
-      if(v==='Awarded') { $('m3_awarded_fields').style.display='block'; $('m3_disq_fields').style.display='none'; $('m3_qual_fields').style.display='none'; }
-      else if(v==='Disqualified') { $('m3_awarded_fields').style.display='none'; $('m3_disq_fields').style.display='block'; $('m3_qual_fields').style.display='none'; }
-      else if(v==='Qualified') { $('m3_awarded_fields').style.display='none'; $('m3_disq_fields').style.display='none'; $('m3_qual_fields').style.display='block'; }
+      if(v==='Awarded') { $('m3_awarded_fields').style.display='block'; $('m3_disq_fields').style.display='none'; $('m3_qual_fields').style.display='none'; if($('m3_ext_fields')) $('m3_ext_fields').style.display='none'; }
+      else if(v==='Disqualified') { $('m3_awarded_fields').style.display='none'; $('m3_disq_fields').style.display='block'; $('m3_qual_fields').style.display='none'; if($('m3_ext_fields')) $('m3_ext_fields').style.display='none'; }
+      else if(v==='Qualified') { $('m3_awarded_fields').style.display='none'; $('m3_disq_fields').style.display='none'; $('m3_qual_fields').style.display='block'; if($('m3_ext_fields')) $('m3_ext_fields').style.display='none'; }
+      else if(v==='Extended') { $('m3_awarded_fields').style.display='none'; $('m3_disq_fields').style.display='none'; $('m3_qual_fields').style.display='none'; if($('m3_ext_fields')) $('m3_ext_fields').style.display='block'; }
   });
   
   $('m_dig')?.addEventListener('change', e=>{
@@ -2993,7 +2995,7 @@ function openModal(id) {
     
     showModal(MW('Phase 3: Award Decision', `
       <div class="grid g2">
-         ${inputGroup('m3_res','Result',r.qualification_result || 'Awarded','select',true,['Awarded','Disqualified','Qualified'])}
+         ${inputGroup('m3_res','Result',r.qualification_result || 'Awarded','select',true,['Awarded','Disqualified','Qualified','Extended'])}
          ${inputGroup('m3_ra','Reverse Auction',r.reverse_auction || 'No','select',true,['Yes','No'])}
          ${inputGroup('m3_qval','Quoted Bid Value (₹)',r.quoted_bid_value || '','number',true)}
          ${inputGroup('m3_rap','Final Price After RA (₹)',r.final_price_after_ra || '','number',true)}
@@ -3007,6 +3009,9 @@ function openModal(id) {
       </div>
       <div id="m3_qual_fields" style="margin-top:12px; display: ${(r.qualification_result || 'Awarded') === 'Qualified' ? 'block' : 'none'}">
          ${inputGroup('m3_qr','Qualification Remarks',r.qualification_remarks || '','textarea',true)}
+      </div>
+      <div id="m3_ext_fields" style="margin-top:12px; display: ${(r.qualification_result || 'Awarded') === 'Extended' ? 'block' : 'none'}">
+         ${inputGroup('m3_ed','Extended Date',r.extended_date || '','date',true)}
       </div>
     `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="ph3SubmitBtn">Save Decision</button>`));
   }
