@@ -4317,10 +4317,9 @@ function ChildTaskList(parentObj, role) {
   const isAdmin = role === 'admin';
   const category = parentObj.data?.category || (parentObj.requirements?.order_number ? 'order' : (S.page === 'leads' ? 'lead' : 'tender'));
   
-  if (!S.childTasksLoaded) {
-    S.childTasksLoaded = true;
+  if (S.childTasksLoadedFor !== parentObj.id) {
+    S.childTasksLoadedFor = parentObj.id;
     loadChildTasks(parentObj.id).then(() => {
-      S.childTasksLoaded = false;
       render();
     });
     return `<div class="loading"><div class="spinner"></div> Loading Child Tasks...</div>`;
