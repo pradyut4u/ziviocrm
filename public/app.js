@@ -2148,7 +2148,7 @@ function TabTenderInfo(t, role) {
           ${inputGroup('service_type','Type of Service',t.service_type,'multiselect',edit,['ILL','MPLS','BroadBand','P2P','NLD'])}
           ${inputGroup('bandwidth_mbps','Bandwidth (Mbps)',t.bandwidth_mbps,'text',edit)}
           ${inputGroup('ddos_with_ill','DDOS with ILL',t.ddos_with_ill,'select',edit,['','Yes','No','Optional'])}
-          ${inputGroup('media_type','Type of Media',t.media_type,'select',edit,['','Fiber','Radio','Copper'])}
+          ${inputGroup('media_type','Type of Media',t.media_type,'multiselect',edit,['Fiber','Radio','Copper'])}
           ${inputGroup('static_ip_required','Static IP Required',t.static_ip_required,'select',edit,['','Yes','No'])}
           ${edit || t.static_ip_required === 'Yes' ? `<div id="sip_wrap" style="display:${t.static_ip_required==='Yes'?'contents':'none'}">
              ${inputGroup('num_ipv4','Number of IPv4 Pools',t.num_ipv4,'number',edit)}
@@ -2567,7 +2567,7 @@ function TabLeadInfo(t, role) {
           ${inputGroup('service_type','Type of Service',t.service_type,'multiselect',edit,['ILL','MPLS','Broadband','P2P','NLD'])}
           ${inputGroup('bandwidth_mbps','Bandwidth (Mbps)',t.bandwidth_mbps,'text',edit)}
           ${inputGroup('ddos_with_ill','DDOS with ILL',t.ddos_with_ill,'select',edit,['','Yes','No','Optional'])}
-          ${inputGroup('media_type','Type of Media',t.media_type,'select',edit,['','Fiber','Radio','Copper'])}
+          ${inputGroup('media_type','Type of Media',t.media_type,'multiselect',edit,['Fiber','Radio','Copper'])}
           ${inputGroup('static_ip_required','Static IP Required',t.static_ip_required,'select',edit,['','Yes','No'])}
           ${edit || t.static_ip_required === 'Yes' ? `<div id="sip_wrap" style="display:${t.static_ip_required==='Yes'?'contents':'none'}">
              ${inputGroup('num_ipv4','Number of IPv4',t.num_ipv4,'number',edit)}
@@ -3719,7 +3719,7 @@ function attachAll() {
       pre_bid_location: $('pre_bid_location')?.value, pre_bid_contact: $('pre_bid_contact')?.value, pre_bid_datetime: $('pre_bid_datetime')?.value,
       contract_period: $('contract_period').value,
       payment_terms: $('payment_terms').value, service_type: Array.from($('service_type').selectedOptions).map(o=>o.value).join(', '), bandwidth_mbps: $('bandwidth_mbps').value || null,
-      ddos_with_ill: $('ddos_with_ill').value, media_type: $('media_type').value, static_ip_required: $('static_ip_required').value,
+      ddos_with_ill: $('ddos_with_ill').value, media_type: Array.from($('media_type').selectedOptions).map(o=>o.value).join(', '), static_ip_required: $('static_ip_required').value,
       num_ipv4: $('num_ipv4')?.value ? parseInt($('num_ipv4').value) : null, num_ipv6: $('num_ipv6')?.value ? parseInt($('num_ipv6').value) : null,
       router_accessories: $('router_accessories').value, router_count: $('router_count')?.value ? parseInt($('router_count').value) : null,
       mrcp: $('mrcp').value || null, gst: $('gst').value || null, total_bid_value: $('total_bid_value').value || null,
@@ -3756,7 +3756,7 @@ function attachAll() {
       pre_bid_location: $('pre_bid_location')?.value, pre_bid_contact: $('pre_bid_contact')?.value, pre_bid_datetime: $('pre_bid_datetime')?.value,
       contract_period: $('contract_period').value, est_bid_value: $('est_bid_value').value || null,
       payment_terms: $('payment_terms').value, service_type: Array.from($('service_type').selectedOptions).map(o=>o.value).join(', '), bandwidth_mbps: $('bandwidth_mbps').value || null,
-      ddos_with_ill: $('ddos_with_ill').value, media_type: $('media_type').value, static_ip_required: $('static_ip_required').value,
+      ddos_with_ill: $('ddos_with_ill').value, media_type: Array.from($('media_type').selectedOptions).map(o=>o.value).join(', '), static_ip_required: $('static_ip_required').value,
       num_ipv4: $('num_ipv4')?.value ? parseInt($('num_ipv4').value) : null, num_ipv6: $('num_ipv6')?.value ? parseInt($('num_ipv6').value) : null,
       router_accessories: $('router_accessories').value, router_count: $('router_count')?.value ? parseInt($('router_count').value) : null,
       total_bid_value: $('total_bid_value').value || null, grievance_contact: $('grievance_contact').value,
