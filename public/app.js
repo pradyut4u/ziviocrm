@@ -2114,6 +2114,10 @@ function inputGroup(id, label, value, type='text', edit=false, options=[]) {
     if (!edit) return `<div class="form-group"><label class="form-label">${label}</label><div class="kbd-val">${esc(value||'-')}</div></div>`;
     if (type === 'textarea') return `<div class="form-group"><label class="form-label">${label}</label><textarea class="form-textarea" id="${id}" rows="3">${esc(value||'')}</textarea></div>`;
     if (type === 'select') return `<div class="form-group"><label class="form-label">${label}</label><select class="form-input" id="${id}">${options.map(o=>`<option value="${o}" ${value===o?'selected':''}>${o}</option>`).join('')}</select></div>`;
+    if (type === 'multiselect') {
+        const vals = Array.isArray(value) ? value : (value||'').toString().split(',').map(v=>v.trim());
+        return `<div class="form-group"><label class="form-label">${label}</label><select class="form-input" id="${id}" multiple size="4">${options.map(o=>`<option value="${o}" ${vals.includes(o)?'selected':''}>${o}</option>`).join('')}</select><div style="font-size:11px;color:var(--text2);margin-top:4px;">Hold Ctrl/Cmd to select multiple</div></div>`;
+    }
     return `<div class="form-group"><label class="form-label">${label}</label><input type="${type}" class="form-input" id="${id}" value="${esc(value||'')}"></div>`;
 }
 
@@ -2141,7 +2145,7 @@ function TabTenderInfo(t, role) {
           ${inputGroup('contract_period','Contract Period',t.contract_period,'text',edit)}
           ${inputGroup('est_bid_value','Estimated Bid Value (₹)',t.est_bid_value,'number',edit)}
           ${inputGroup('payment_terms','Payment Terms',t.payment_terms,'text',edit)}
-          ${inputGroup('service_type','Type of Service',t.service_type,'select',edit,['','ILL','MPLS','BroadBand','P2P','NLD'])}
+          ${inputGroup('service_type','Type of Service',t.service_type,'multiselect',edit,['ILL','MPLS','BroadBand','P2P','NLD'])}
           ${inputGroup('bandwidth_mbps','Bandwidth (Mbps)',t.bandwidth_mbps,'text',edit)}
           ${inputGroup('ddos_with_ill','DDOS with ILL',t.ddos_with_ill,'select',edit,['','Yes','No','Optional'])}
           ${inputGroup('media_type','Type of Media',t.media_type,'select',edit,['','Fiber','Radio','Copper'])}
@@ -2560,7 +2564,7 @@ function TabLeadInfo(t, role) {
           ${inputGroup('order_number','Order Number',t.requirements?.order_number,'text',edit)}
           ${inputGroup('contract_period','Contract Period',t.contract_period,'text',edit)}
           ${inputGroup('payment_terms','Payment Terms',t.payment_terms,'text',edit)}
-          ${inputGroup('service_type','Type of Service',t.service_type,'select',edit,['','ILL','MPLS','Broadband','P2P','NLD'])}
+          ${inputGroup('service_type','Type of Service',t.service_type,'multiselect',edit,['ILL','MPLS','Broadband','P2P','NLD'])}
           ${inputGroup('bandwidth_mbps','Bandwidth (Mbps)',t.bandwidth_mbps,'text',edit)}
           ${inputGroup('ddos_with_ill','DDOS with ILL',t.ddos_with_ill,'select',edit,['','Yes','No','Optional'])}
           ${inputGroup('media_type','Type of Media',t.media_type,'select',edit,['','Fiber','Radio','Copper'])}
@@ -3714,7 +3718,7 @@ function attachAll() {
       org_name: $('org_name').value,
       pre_bid_location: $('pre_bid_location')?.value, pre_bid_contact: $('pre_bid_contact')?.value, pre_bid_datetime: $('pre_bid_datetime')?.value,
       contract_period: $('contract_period').value,
-      payment_terms: $('payment_terms').value, service_type: $('service_type').value, bandwidth_mbps: $('bandwidth_mbps').value || null,
+      payment_terms: $('payment_terms').value, service_type: Array.from($('service_type').selectedOptions).map(o=>o.value).join(', '), bandwidth_mbps: $('bandwidth_mbps').value || null,
       ddos_with_ill: $('ddos_with_ill').value, media_type: $('media_type').value, static_ip_required: $('static_ip_required').value,
       num_ipv4: $('num_ipv4')?.value ? parseInt($('num_ipv4').value) : null, num_ipv6: $('num_ipv6')?.value ? parseInt($('num_ipv6').value) : null,
       router_accessories: $('router_accessories').value, router_count: $('router_count')?.value ? parseInt($('router_count').value) : null,
@@ -3751,7 +3755,7 @@ function attachAll() {
       dept_name: $('dept_name').value, 
       pre_bid_location: $('pre_bid_location')?.value, pre_bid_contact: $('pre_bid_contact')?.value, pre_bid_datetime: $('pre_bid_datetime')?.value,
       contract_period: $('contract_period').value, est_bid_value: $('est_bid_value').value || null,
-      payment_terms: $('payment_terms').value, service_type: $('service_type').value, bandwidth_mbps: $('bandwidth_mbps').value || null,
+      payment_terms: $('payment_terms').value, service_type: Array.from($('service_type').selectedOptions).map(o=>o.value).join(', '), bandwidth_mbps: $('bandwidth_mbps').value || null,
       ddos_with_ill: $('ddos_with_ill').value, media_type: $('media_type').value, static_ip_required: $('static_ip_required').value,
       num_ipv4: $('num_ipv4')?.value ? parseInt($('num_ipv4').value) : null, num_ipv6: $('num_ipv6')?.value ? parseInt($('num_ipv6').value) : null,
       router_accessories: $('router_accessories').value, router_count: $('router_count')?.value ? parseInt($('router_count').value) : null,
