@@ -2,12 +2,12 @@
 // TENDEROPS — ISP Tender Management System (Vanilla JS SPA)
 // ============================================================
 
-// ---- State ----
 const S = {
   user: null, token: localStorage.getItem('_tok'),
   workspaceId: localStorage.getItem('_ws') || null, workspaces: [],
   page: 'dashboard', tenderId: null, tab: 'tender_info',
   adminTab: 'users', tenders: [], tender: null,
+  childTaskId: null, childTask: null, childTasks: [],
   users: [], audit: [], notifications: [], unread: 0,
   modal: null, notifOpen: false
 };
@@ -994,16 +994,18 @@ function Pipeline(stage, cat) {
 
 // ---- Pages ----
 function renderPage() {
+  if (S.childTaskId) return ChildTaskDetail();
   switch(S.page) {
     case 'dashboard': return PageDashboard();
     case 'leads':     return S.leadId ? LeadDetail() : PageLeads();
     case 'tenders':   return S.tenderId ? PageDetail() : PageTenders();
-    case 'technical': return S.tenderId ? PageDetail() : PageTechnical();
-    case 'billing':   return S.tenderId ? PageDetail() : PageBilling();
+    case 'technical': return (S.tenderId || S.leadId) ? (S.leadId ? LeadDetail() : PageDetail()) : PageTechnical();
+    case 'billing':   return (S.tenderId || S.leadId) ? (S.leadId ? LeadDetail() : PageDetail()) : PageBilling();
     case 'admin':     return PageAdmin();
     default: return PageDashboard();
   }
 }
+
 
 // ---- Dashboard ----
 function PageDashboard() {
@@ -1777,34 +1779,36 @@ function PageDetail() {
 
 function detailTabs(t, role) {
   const cat = t.data?.category;
+  let tabs = [];
+  
   if (cat === 'order') {
-    const tabs = [{k:'order_details',l:'Order Details'}];
+    tabs = [{k:'order_details',l:'Order Details'}];
     if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
-    return tabs;
-  }
-  if (cat === 'procurement') return [{k:'procurement_details',l:'Procurement Details'}];
-  
-  const ALL = STAGES;
-  const si = ALL.indexOf(t.stage);
-  const tabs = [];
-  
-  if (cat === 'project') {
-    if (role === 'tender' || role === 'admin' || role === 'mgmt' || role === 'lead') {
-        tabs.push({k:'project_details',l:'Phase 1: Project Details'});
+  } else if (cat === 'procurement') {
+    tabs = [{k:'procurement_details',l:'Procurement Details'}];
+  } else {
+    const ALL = STAGES;
+    const si = ALL.indexOf(t.stage);
+    
+    if (cat === 'project') {
+      if (role === 'tender' || role === 'admin' || role === 'mgmt' || role === 'lead') {
+          tabs.push({k:'project_details',l:'Phase 1: Project Details'});
+      }
+      if (si >= ALL.indexOf('ph2_active')) tabs.push({k:'project_technical',l:'Phase 2: Technical'});
+      if (role !== 'tech' && si >= ALL.indexOf('ph3_active')) tabs.push({k:'project_installation',l:'Phase 3: Installation'});
+      if (si >= ALL.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
+    } else {
+      if (role === 'tender' || role === 'admin' || role === 'mgmt' || role === 'lead') {
+          tabs.push({k:'tender_info',l:'Phase 1: Overview'});
+      }
+      if (si >= ALL.indexOf('ph2_active')) tabs.push({k:'technical',l:'Phase 2: Technical'});
+      if (role !== 'tech' && si >= ALL.indexOf('ph3_active')) tabs.push({k:'award',l:'Phase 3: Award'});
+      if (si >= ALL.indexOf('ph4_active')) tabs.push({k:'delivery',l:'Phase 4: Delivery'});
+      if (si >= ALL.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
     }
-    if (si >= ALL.indexOf('ph2_active')) tabs.push({k:'project_technical',l:'Phase 2: Technical'});
-    if (role !== 'tech' && si >= ALL.indexOf('ph3_active')) tabs.push({k:'project_installation',l:'Phase 3: Installation'});
-    if (si >= ALL.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
-    return tabs;
   }
 
-  if (role === 'tender' || role === 'admin' || role === 'mgmt') {
-      tabs.push({k:'tender_info',l:'Phase 1: Tender'});
-  }
-  if (si >= ALL.indexOf('ph2_active')) tabs.push({k:'technical',l:'Phase 2: Technical'});
-  if (role !== 'tech' && si >= ALL.indexOf('ph3_active')) tabs.push({k:'award',l:'Phase 3: Award'});
-  if (si >= ALL.indexOf('ph4_active')) tabs.push({k:'delivery',l:'Phase 4: Delivery'});
-  if (si >= ALL.indexOf('ph5_active')) tabs.push({k:'billing',l:'Phase 5: Billing'});
+  tabs.push({k:'child_tasks', l:'Child Tasks'});
   return tabs;
 }
 
@@ -1840,6 +1844,7 @@ function renderTab(t, tab, role) {
       case 'award': return TabAward(t, role);
       case 'delivery': return TabDelivery(t, role);
       case 'billing': return TabBilling(t, role);
+      case 'child_tasks': return ChildTaskList(t, role);
       default: return TabTenderInfo(t, role);
     }
 }
@@ -2952,6 +2957,188 @@ function attachModalHandlers() {
          if(S.leadId) await loadLead(id); else await loadTender(id); removeModal(); render(); toast('Cycle saved!','success');
      } catch(e){toast(e.message,'error');}
   });
+
+  // --- Child Task Submit Handlers ---
+  $('ctPh2SubmitBtn')?.addEventListener('click', async()=>{
+     try {
+       let fUrl = null, sUrl = null;
+       if($('ctr_fdoc').files[0]) {
+         const r = await uploadFile($('ctr_fdoc').files[0]);
+         if(r) fUrl = r.url;
+       }
+       if($('ctr_sdoc').files[0]) {
+         const r = await uploadFile($('ctr_sdoc').files[0]);
+         if(r) sUrl = r.url;
+       }
+       const { error } = await sbClient.from('child_task_technical_reports').insert({
+         child_task_id: S.childTaskId,
+         workspace_id: S.workspaceId,
+         submitted_by: S.user.id,
+         service_provider: $('ctr_sp').value,
+         survey_date: $('ctr_sdate').value || null,
+         survey_conducted_by: $('ctr_scby').value,
+         type_of_premises: $('ctr_prem').value,
+         building_structure: $('ctr_bstruct').value,
+         nearest_pop_dist: $('ctr_popd').value || null,
+         accessibility: $('ctr_acc').value,
+         power_availability: $('ctr_pwr').value,
+         rack_space: $('ctr_rack').value,
+         environment_conditions: $('ctr_env').value,
+         pop_type: $('ctr_poptype').value,
+         digging_needed: $('ctr_dig').value,
+         digging_details: $('ctr_digdet').value,
+         feasibility_status: $('ctr_fstat').value,
+         survey_notes: $('ctr_snotes').value,
+         feasibility_doc_url: fUrl,
+         site_survey_doc_url: sUrl
+       });
+       if(error) throw error;
+       await sbClient.from('child_tasks').update({stage: 'ph2_complete'}).eq('id', S.childTaskId);
+       await loadChildTask(S.childTaskId);
+       removeModal(); render(); toast('Technical Report Submitted', 'success');
+     } catch(e){ toast(e.message, 'error'); }
+  });
+
+  $('ctPh3SubmitBtn')?.addEventListener('click', async()=>{
+     try {
+       const res = $('ctr3_res').value;
+       const { error } = await sbClient.from('child_task_phase3_records').insert({
+         child_task_id: S.childTaskId,
+         workspace_id: S.workspaceId,
+         created_by: S.user.id,
+         qualification_result: res,
+         quoted_bid_value: $('ctr3_qval').value || null,
+         award_date: $('ctr3_ad')?.value || null,
+         notes: $('ctr3_notes').value
+       });
+       if(error) throw error;
+       let nextStage = 'ph3_active';
+       if(res === 'Awarded') nextStage = 'ph3_awarded';
+       else if(res === 'Disqualified') nextStage = 'ph3_disqualified';
+       await sbClient.from('child_tasks').update({stage: nextStage}).eq('id', S.childTaskId);
+       await loadChildTask(S.childTaskId);
+       removeModal(); render(); toast('Award Decision Saved', 'success');
+     } catch(e){ toast(e.message, 'error'); }
+  });
+
+  $('ctr3_res')?.addEventListener('change', e=>{
+      const v = e.target.value;
+      if(v==='Awarded') { $('ctr3_awarded_fields').style.display='block'; }
+      else { $('ctr3_awarded_fields').style.display='none'; }
+  });
+
+  $('ctr_dig')?.addEventListener('change', e=>{
+      const w = $('ctr_digdet_wrap');
+      if(w) w.style.display = e.target.value === 'Yes' ? 'block' : 'none';
+  });
+
+  $('ctPh4SubmitBtn')?.addEventListener('click', async()=>{
+     try {
+       let aUrl = null, cUrl = null;
+       if($('ctr4_adoc').files[0]) {
+         const r = await uploadFile($('ctr4_adoc').files[0]);
+         if(r) aUrl = r.url;
+       }
+       if($('ctr4_cdoc').files[0]) {
+         const r = await uploadFile($('ctr4_cdoc').files[0]);
+         if(r) cUrl = r.url;
+       }
+       
+       const v4Str = $('ctr4_ipv4').value.trim();
+       const v6Str = $('ctr4_ipv6').value.trim();
+       const rtrStr = $('ctr4_routers').value.trim();
+       
+       const { error } = await sbClient.from('child_task_phase4_records').insert({
+         child_task_id: S.childTaskId,
+         workspace_id: S.workspaceId,
+         created_by: S.user.id,
+         delivery_date: $('ctr4_ad').value || null,
+         delivery_notes: $('ctr4_rem').value,
+         ipv4_addresses: v4Str ? v4Str.split(',').map(s=>s.trim()) : null,
+         ipv6_addresses: v6Str ? v6Str.split(',').map(s=>s.trim()) : null,
+         router_names: rtrStr ? rtrStr.split(',').map(s=>s.trim()) : null,
+         acceptance_form_url: aUrl,
+         completion_cert_url: cUrl
+       });
+       if(error) throw error;
+       await sbClient.from('child_tasks').update({stage: 'ph4_complete'}).eq('id', S.childTaskId);
+       await loadChildTask(S.childTaskId);
+       removeModal(); render(); toast('Delivery Marked', 'success');
+     } catch(e){ toast(e.message, 'error'); }
+  });
+
+  $('ctPh5InvBtn')?.addEventListener('click', async()=>{
+     try {
+       let dUrl = null;
+       if($('ctr5_doc').files[0]) {
+         const r = await uploadFile($('ctr5_doc').files[0]);
+         if(r) dUrl = r.url;
+       }
+       const { error } = await sbClient.from('child_task_invoices').insert({
+         child_task_id: S.childTaskId,
+         workspace_id: S.workspaceId,
+         created_by: S.user.id,
+         award_date: $('ctr5_ad').value || null,
+         invoice_number: $('ctr5_in').value,
+         total_price: $('ctr5_tot').value || null,
+         billing_price: $('ctr5_bp').value || null,
+         base_price: $('ctr5_base').value || null,
+         gst_pct: $('ctr5_gst').value || 18,
+         duration_from: $('ctr5_df').value || null,
+         duration_to: $('ctr5_dt').value || null,
+         payment_cycle: $('ctr5_pc').value,
+         invoice_upload_url: dUrl
+       });
+       if(error) throw error;
+       await loadChildTask(S.childTaskId);
+       removeModal(); render(); toast('Invoice Header Saved', 'success');
+     } catch(e){ toast(e.message, 'error'); }
+  });
+
+  $('ctCycBtn')?.addEventListener('click', async()=>{
+     try {
+       const cid = $('ctc_id')?.value;
+       let dUrl = null;
+       if($('ctc_doc').files[0]) {
+         const r = await uploadFile($('ctc_doc').files[0]);
+         if(r) dUrl = r.url;
+       }
+       const p = {
+         workspace_id: S.workspaceId,
+         period_from: $('ctc_pf').value || null,
+         period_to: $('ctc_pt').value || null,
+         amount_due: $('ctc_ad').value || null,
+         payment_status: $('ctc_ps').value || 'Pending',
+         amount_received: $('ctc_ar').value || 0,
+         payment_date: $('ctc_pd').value || null,
+         invoice_number: $('ctc_in').value,
+       };
+       if(dUrl) p.invoice_doc_url = dUrl;
+
+       if(cid) {
+         const { error } = await sbClient.from('child_task_payment_cycles').update(p).eq('id', cid);
+         if(error) throw error;
+       } else {
+         p.child_task_id = S.childTaskId;
+         p.created_by = S.user.id;
+         p.cycle_number = (S.childTask?.payment_cycles?.length || 0) + 1;
+         const { error } = await sbClient.from('child_task_payment_cycles').insert(p);
+         if(error) throw error;
+       }
+       
+       await loadChildTask(S.childTaskId);
+       
+       if (S.childTask && S.childTask.payment_cycles && S.childTask.payment_cycles.length > 0) {
+         const allPaid = S.childTask.payment_cycles.every(c => c.payment_status === 'Paid');
+         if(allPaid && S.childTask.stage !== 'closed') {
+           await sbClient.from('child_tasks').update({stage: 'closed'}).eq('id', S.childTaskId);
+           await loadChildTask(S.childTaskId);
+         }
+       }
+
+       removeModal(); render(); toast('Payment Cycle Saved', 'success');
+     } catch(e){ toast(e.message, 'error'); }
+  });
 }
 
 window.editCycle = (cid) => {
@@ -2964,6 +3151,18 @@ window.editCycle = (cid) => {
        $('mc_ad').value=c.amount_due||''; $('mc_ps').value=c.payment_status||'Pending';
        $('mc_ar').value=c.amount_received||''; $('mc_pd').value=c.payment_date||'';
        if($('mc_in')) $('mc_in').value=c.invoice_number||'';
+    },50);
+}
+
+window.editCtCycle = (cid) => {
+    const c = S.childTask?.payment_cycles?.find(x=>x.id===cid);
+    if(!c) return;
+    openModal('ct-ph5-cycle');
+    setTimeout(()=>{
+       $('ctc_id').value=cid; $('ctc_pf').value=c.period_from||''; $('ctc_pt').value=c.period_to||'';
+       $('ctc_ad').value=c.amount_due||''; $('ctc_ps').value=c.payment_status||'Pending';
+       $('ctc_ar').value=c.amount_received||''; $('ctc_pd').value=c.payment_date||'';
+       if($('ctc_in')) $('ctc_in').value=c.invoice_number||'';
     },50);
 }
 
@@ -3127,6 +3326,98 @@ function openModal(id) {
          <div class="form-group"><label class="form-label">Invoice Doc</label><input type="file" id="mc_doc" class="form-input"></div>
       </div>
     `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="ph5CycBtn">Save Cycle</button>`));
+  }
+
+  // --- Child Task Modals ---
+  if (id === 'ct-ph2-report') {
+    showModal(MW('Child Task - Phase 2: Technical Report', `
+      <div class="grid g2" style="max-height:60vh;overflow-y:auto;padding:4px">
+         ${inputGroup('ctr_sp','Service Provider','','text',true)}
+         ${inputGroup('ctr_sdate','Survey Date','','date',true)}
+         ${inputGroup('ctr_scby','Survey Conducted By','','text',true)}
+         ${inputGroup('ctr_prem','Type of Premises','Office','select',true,['Office','Plant','Solar Facility','Control Room'])}
+         ${inputGroup('ctr_bstruct','Building Structure','Single Floor','select',true,['Single Floor','Multi-floor','Open Field Setup'])}
+         ${inputGroup('ctr_popd','Nearest POP Dist (Mtr)','','number',true)}
+         ${inputGroup('ctr_acc','Accessibility','Easy','select',true,['Easy','Moderate','Difficult'])}
+         ${inputGroup('ctr_pwr','Power Availability','Yes','select',true,['Yes','No'])}
+         ${inputGroup('ctr_rack','Rack Space','Yes','select',true,['Yes','No'])}
+         ${inputGroup('ctr_env','Environment Conditions','Normal','select',true,['Dust','Heat','Outdoor Exposure','Normal'])}
+         ${inputGroup('ctr_poptype','POP Type','','select',true,['','FAT Box','Chamber','BTS','RF'])}
+         ${inputGroup('ctr_dig','Digging Needed','No','select',true,['Yes','No'])}
+         <div id="ctr_digdet_wrap" style="display:none; grid-column:1/-1;">
+           ${inputGroup('ctr_digdet','Digging Details','','textarea',true)}
+         </div>
+         ${inputGroup('ctr_fstat','Feasibility Status','Feasible','select',true,['Feasible','Not Feasible','Needs Review'])}
+         ${inputGroup('ctr_snotes','Survey Notes','','textarea',true)}
+         <div class="form-group"><label class="form-label">Feasibility Doc</label><input type="file" id="ctr_fdoc" class="form-input"></div>
+         <div class="form-group"><label class="form-label">Site Survey Doc</label><input type="file" id="ctr_sdoc" class="form-input"></div>
+      </div>
+    `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="ctPh2SubmitBtn">Submit Report</button>`,`modal-lg`));
+  }
+
+  if (id === 'ct-ph3-award') {
+    const recs = S.childTask?.phase3_records || [];
+    const r = recs[recs.length - 1] || {};
+    showModal(MW('Child Task - Phase 3: Award Decision', `
+      <div class="grid g2">
+         ${inputGroup('ctr3_res','Result',r.qualification_result || 'Awarded','select',true,['Awarded','Disqualified','Qualified','Extended'])}
+         ${inputGroup('ctr3_qval','Quoted Bid Value (₹)',r.quoted_bid_value || '','number',true)}
+      </div>
+      <div id="ctr3_awarded_fields" style="margin-top:12px; display: ${(r.qualification_result || 'Awarded') === 'Awarded' ? 'block' : 'none'}">
+         ${inputGroup('ctr3_ad','Award Date',r.award_date || '','date',true)}
+      </div>
+      <div style="margin-top:12px">
+         ${inputGroup('ctr3_notes','Notes / Remarks',r.notes || '','textarea',true)}
+      </div>
+    `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="ctPh3SubmitBtn">Save Decision</button>`));
+  }
+
+  if (id === 'ct-ph4-deliver') {
+    showModal(MW('Child Task - Phase 4: Delivery', `
+      <div class="grid g1">
+         ${inputGroup('ctr4_ad','Actual Delivery Date','','date',true)}
+         ${inputGroup('ctr4_ipv4','IPv4 Addresses (comma separated)','','text',true)}
+         ${inputGroup('ctr4_ipv6','IPv6 Addresses (comma separated)','','text',true)}
+         ${inputGroup('ctr4_routers','Routers/Accessories (comma separated)','','text',true)}
+         ${inputGroup('ctr4_rem','Delivery Notes','','textarea',true)}
+         <div class="form-group"><label class="form-label">Acceptance Form</label><input type="file" id="ctr4_adoc" class="form-input"></div>
+         <div class="form-group"><label class="form-label">Completion Cert</label><input type="file" id="ctr4_cdoc" class="form-input"></div>
+      </div>
+    `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="ctPh4SubmitBtn">Mark Delivered</button>`));
+  }
+
+  if (id === 'ct-ph5-invoice') {
+    const ct = S.childTask || {};
+    showModal(MW('Child Task - Phase 5: Invoice Header', `
+      <div class="grid g2">
+         ${inputGroup('ctr5_ad','Award Date','','date',true)}
+         ${inputGroup('ctr5_in','Invoice Number','','text',true)}
+         ${inputGroup('ctr5_tot','Total Contract Price','','number',true)}
+         ${inputGroup('ctr5_bp','Billing Price','','number',true)}
+         ${inputGroup('ctr5_base','Base Price','','number',true)}
+         ${inputGroup('ctr5_gst','GST %','18','number',true)}
+         ${inputGroup('ctr5_df','Duration From',ct.start_date || '','date',true)}
+         ${inputGroup('ctr5_dt','Duration To',ct.end_date || '','date',true)}
+         ${inputGroup('ctr5_pc','Payment Cycle','Monthly','select',true,['Monthly','Quarterly','Half-yearly','Annual','One-time'])}
+         <div class="form-group" style="grid-column:1/-1"><label class="form-label">Invoice Document</label><input type="file" id="ctr5_doc" class="form-input"></div>
+      </div>
+    `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="ctPh5InvBtn">Save Invoice Header</button>`));
+  }
+
+  if (id === 'ct-ph5-cycle') {
+    showModal(MW('Child Task - Payment Cycle', `
+      <input type="hidden" id="ctc_id">
+      <div class="grid g2">
+         ${inputGroup('ctc_pf','Period From','','date',true)}
+         ${inputGroup('ctc_pt','Period To','','date',true)}
+         ${inputGroup('ctc_ad','Amount Due','','number',true)}
+         ${inputGroup('ctc_ps','Payment Status','Pending','select',true,['Pending','Partial','Paid'])}
+         ${inputGroup('ctc_ar','Amount Received','','number',true)}
+         ${inputGroup('ctc_pd','Payment Date','','date',true)}
+         ${inputGroup('ctc_in','Invoice Number','','text',true)}
+         <div class="form-group"><label class="form-label">Invoice Doc</label><input type="file" id="ctc_doc" class="form-input"></div>
+      </div>
+    `, `<button class="btn btn-ghost" onclick="removeModal()">Cancel</button><button class="btn btn-primary" id="ctCycBtn">Save Cycle</button>`));
   }
 }
 
@@ -3816,6 +4107,627 @@ window.toggleUserStatus = async function(userId, currentStatus) {
     toast(e.message, 'error');
   }
 };
+
+// ==========================================
+// Child Tasks Feature
+// ==========================================
+async function loadChildTasks(parentId) {
+  try {
+    const { data, error } = await sbClient.from('child_tasks').select('*').eq('parent_id', parentId).order('created_at', {ascending: false});
+    if (error) throw error;
+    S.childTasks = data || [];
+  } catch(e) {
+    console.error('Failed to load child tasks', e);
+    toast('Failed to load child tasks', 'error');
+  }
+}
+
+async function loadChildTask(id) {
+  try {
+    const { data, error } = await sbClient.from('child_tasks')
+      .select('*, child_task_documents(*), child_task_technical_reports(*), child_task_phase3_records(*), child_task_phase4_records(*), child_task_invoices(*), child_task_payment_cycles(*)')
+      .eq('id', id).single();
+    if (error) throw error;
+    S.childTask = data;
+    S.childTaskId = id;
+    S.childTask.documents = data.child_task_documents || [];
+    S.childTask.technical_reports = data.child_task_technical_reports || [];
+    S.childTask.phase3_records = data.child_task_phase3_records || [];
+    S.childTask.phase4_records = data.child_task_phase4_records || [];
+    S.childTask.invoices = data.child_task_invoices || [];
+    S.childTask.payment_cycles = data.child_task_payment_cycles || [];
+  } catch(e) {
+    console.error('Failed to load child task', e);
+    toast('Failed to load child task', 'error');
+  }
+}
+
+window.openCreateChildTask = function(parentId, parentType, parentCategory) {
+  const p = S.tender || S.lead;
+  if (!p) return;
+  
+  const body = `
+    <div class="form-grid">
+      ${inputGroup('ct_title','Title (Required)','','text',true)}
+      ${inputGroup('ct_start','Start Date (Required)','','date',true)}
+      ${inputGroup('ct_end','End Date (Required)','','date',true)}
+      ${inputGroup('ct_total','Total Value (Optional)','','number',true)}
+      <div style="grid-column: 1 / -1; margin-top:12px; font-weight:600;">Selected Phases</div>
+      <div style="grid-column: 1 / -1; display:flex; gap:16px;">
+         <label><input type="checkbox" id="ct_ph2"> Phase 2: Technical</label>
+         <label><input type="checkbox" id="ct_ph3"> Phase 3: Award</label>
+         <label><input type="checkbox" id="ct_ph4"> Phase 4: Delivery</label>
+         <label><input type="checkbox" id="ct_ph5" checked disabled> Phase 5: Billing (Always)</label>
+      </div>
+      <div style="grid-column: 1 / -1; margin-top:12px; font-weight:600;">Inherited Details (Editable)</div>
+      ${inputGroup('ct_cname','Contact Name',p.contact_name||'','text',true)}
+      ${inputGroup('ct_cphone','Contact Phone',p.contact_phone||'','text',true)}
+      ${inputGroup('ct_cemail','Contact Email',p.contact_email||'','text',true)}
+      ${inputGroup('ct_org','Organization',p.org_name||'','text',true)}
+      ${inputGroup('ct_srv','Service Type',p.service_type||'','text',true)}
+      ${inputGroup('ct_bw','Bandwidth (Mbps)',p.bandwidth_mbps||'','number',true)}
+      <div style="grid-column: 1 / -1;">
+        <label class="form-label">Delivery Address</label>
+        <textarea id="ct_addr" class="form-control">${esc(p.link_delivery_address || '')}</textarea>
+      </div>
+    </div>
+    <div style="margin-top:20px; font-weight:600;">Extra Fields (Type: ${parentCategory})</div>
+    <div class="form-grid" id="ct_extra_fields">
+      ${renderExtraFieldsByCategoryForm(parentCategory, {})}
+    </div>
+  `;
+  showModal(MW('Create Child Task', body, `
+    <button class="btn btn-ghost" onclick="removeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="createChildTask('${parentId}','${parentType}','${parentCategory}')">Create Task</button>
+  `));
+};
+
+function renderExtraFieldsByCategoryForm(category, extra) {
+  if (category === 'tender') {
+     return `
+       ${inputGroup('ex_bid_number','Bid Number',extra.bid_number||'','text',true)}
+       ${inputGroup('ex_pre_bid','Pre-bid Datetime',extra.pre_bid_datetime||'','datetime-local',true)}
+       ${inputGroup('ex_bid_end','Bid End Datetime',extra.bid_end_datetime||'','datetime-local',true)}
+       ${inputGroup('ex_ministry','Ministry/State',extra.ministry_state||'','text',true)}
+       ${inputGroup('ex_dept','Department',extra.dept_name||'','text',true)}
+       ${inputGroup('ex_grievance','Grievance Contact',extra.grievance_contact||'','text',true)}
+       ${inputGroup('ex_pay_terms','Payment Terms',extra.payment_terms||'','text',true)}
+       ${inputGroup('ex_contract','Contract Period',extra.contract_period||'','text',true)}
+       ${inputGroup('ex_est_val','Est Bid Value',extra.est_bid_value||'','number',true)}
+     `;
+  }
+  if (category === 'lead') {
+     return `
+       ${inputGroup('ex_order_number','Order Number',extra.order_number||'','text',true)}
+       ${inputGroup('ex_mrcp','MRCP',extra.mrcp||'','text',true)}
+       ${inputGroup('ex_gst','GST %',extra.gst||'18','number',true)}
+       ${inputGroup('ex_dept','Department',extra.dept_name||'','text',true)}
+       ${inputGroup('ex_pay_terms','Payment Terms',extra.payment_terms||'','text',true)}
+       ${inputGroup('ex_contract','Contract Period',extra.contract_period||'','text',true)}
+     `;
+  }
+  if (category === 'order' || category === 'project') {
+     return `
+       ${inputGroup('ex_order_number','Order Number',extra.order_number||'','text',true)}
+       ${inputGroup('ex_cust_name','Customer Name',extra.customer_name||'','text',true)}
+       <div style="grid-column: 1 / -1; color: var(--text2); font-size:12px;">(Items and Custom Columns can be added inside the task)</div>
+     `;
+  }
+  return '';
+}
+
+function extractExtraFields(category) {
+  const extra = {};
+  if (category === 'tender') {
+    extra.bid_number = $('ex_bid_number')?.value;
+    extra.pre_bid_datetime = $('ex_pre_bid')?.value;
+    extra.bid_end_datetime = $('ex_bid_end')?.value;
+    extra.ministry_state = $('ex_ministry')?.value;
+    extra.dept_name = $('ex_dept')?.value;
+    extra.grievance_contact = $('ex_grievance')?.value;
+    extra.payment_terms = $('ex_pay_terms')?.value;
+    extra.contract_period = $('ex_contract')?.value;
+    extra.est_bid_value = $('ex_est_val')?.value;
+  }
+  if (category === 'lead') {
+    extra.order_number = $('ex_order_number')?.value;
+    extra.mrcp = $('ex_mrcp')?.value;
+    extra.gst = $('ex_gst')?.value;
+    extra.dept_name = $('ex_dept')?.value;
+    extra.payment_terms = $('ex_pay_terms')?.value;
+    extra.contract_period = $('ex_contract')?.value;
+  }
+  if (category === 'order' || category === 'project') {
+    extra.order_number = $('ex_order_number')?.value;
+    extra.customer_name = $('ex_cust_name')?.value;
+    extra.items = [];
+    extra.custom_columns = [];
+  }
+  return extra;
+}
+
+window.createChildTask = async function(parentId, parentType, parentCategory) {
+  const title = $('ct_title').value.trim();
+  const start_date = $('ct_start').value;
+  const end_date = $('ct_end').value;
+  if(!title || !start_date || !end_date) return toast('Title, Start Date, and End Date are required', 'error');
+
+  const phases = ['ph5'];
+  if($('ct_ph2')?.checked) phases.push('ph2');
+  if($('ct_ph3')?.checked) phases.push('ph3');
+  if($('ct_ph4')?.checked) phases.push('ph4');
+
+  const selected_phases = phases.sort();
+
+  let stage = 'ph5_active';
+  if(selected_phases.includes('ph2')) stage = 'ph2_active';
+  else if(selected_phases.includes('ph3')) stage = 'ph3_active';
+  else if(selected_phases.includes('ph4')) stage = 'ph4_active';
+
+  const body = {
+    parent_id: parentId,
+    parent_type: parentType,
+    parent_category: parentCategory,
+    workspace_id: S.workspaceId,
+    title,
+    start_date,
+    end_date,
+    total_value: $('ct_total').value || null,
+    contact_name: $('ct_cname').value,
+    contact_phone: $('ct_cphone').value,
+    contact_email: $('ct_cemail').value,
+    org_name: $('ct_org').value,
+    service_type: $('ct_srv').value,
+    bandwidth_mbps: $('ct_bw').value || null,
+    delivery_address: $('ct_addr').value,
+    selected_phases,
+    stage,
+    extra_fields: extractExtraFields(parentCategory),
+    created_by: S.user.id
+  };
+
+  try {
+    const { data, error } = await sbClient.from('child_tasks').insert(body).select();
+    if(error) throw error;
+    toast('Child task created', 'success');
+    removeModal();
+    await loadChildTasks(parentId);
+    render();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+window.deleteChildTask = async function(id) {
+  if(!confirm('Are you sure you want to delete this child task? This cannot be undone.')) return;
+  try {
+    const { error } = await sbClient.from('child_tasks').delete().eq('id', id);
+    if(error) throw error;
+    toast('Child task deleted', 'success');
+    S.childTaskId = null;
+    S.childTask = null;
+    await loadChildTasks(S.tenderId || S.leadId);
+    render();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+function ChildTaskList(parentObj, role) {
+  const isAdmin = role === 'admin';
+  const category = parentObj.data?.category || (parentObj.requirements?.order_number ? 'order' : (S.page === 'leads' ? 'lead' : 'tender'));
+  
+  if (!S.childTasksLoaded) {
+    S.childTasksLoaded = true;
+    loadChildTasks(parentObj.id).then(() => {
+      S.childTasksLoaded = false;
+      render();
+    });
+    return `<div class="loading"><div class="spinner"></div> Loading Child Tasks...</div>`;
+  }
+
+  const list = S.childTasks || [];
+
+  return `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+        <h3>Child Tasks</h3>
+        ${isAdmin ? `<button class="btn btn-primary btn-sm" onclick="openCreateChildTask('${parentObj.id}','${S.page === 'leads' ? 'lead' : 'tender'}','${category}')">+ New Child Task</button>` : ''}
+      </div>
+      ${list.length ? `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Phases</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                ${isAdmin ? '<th>Total Value</th>' : ''}
+                <th>Stage</th>
+                ${isAdmin ? '<th>Actions</th>' : ''}
+              </tr>
+            </thead>
+            <tbody>
+              ${list.map(ct => `
+                <tr class="tr-link" onclick="if(event.target.tagName !== 'BUTTON') { S.childTaskId = '${ct.id}'; render(); }">
+                  <td style="font-weight:600; color:var(--primary); cursor:pointer;">${esc(ct.title)}</td>
+                  <td>${ct.selected_phases.map(p => p.toUpperCase()).join(', ')}</td>
+                  <td>${fmt(ct.start_date, 'date')}</td>
+                  <td>${fmt(ct.end_date, 'date')}</td>
+                  ${isAdmin ? `<td>${fmt(ct.total_value, 'currency')}</td>` : ''}
+                  <td>${stageBadge(ct.stage)}</td>
+                  ${isAdmin ? `<td><button class="btn btn-ghost text-red" onclick="deleteChildTask('${ct.id}')">Delete</button></td>` : ''}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : `<div class="empty"><div class="empty-icon">📁</div><div class="empty-title">No child tasks created yet</div></div>`}
+    </div>
+  `;
+}
+
+function ChildTaskDetail() {
+  const ct = S.childTask;
+  if(!ct || ct.id !== S.childTaskId) {
+     loadChildTask(S.childTaskId).then(() => render());
+     return `<div class="loading"><div class="spinner"></div> Loading Task...</div>`;
+  }
+  const role = S.user?.role;
+  const isAdmin = role === 'admin';
+  
+  const showValue = isAdmin || ['ph3_active','ph3_awarded','ph5_active','closed'].includes(ct.stage);
+
+  const tabs = [{k:'overview', l:'Overview'}];
+  if(ct.selected_phases.includes('ph2')) tabs.push({k:'ph2', l:'Phase 2: Technical'});
+  if(ct.selected_phases.includes('ph3')) tabs.push({k:'ph3', l:'Phase 3: Award'});
+  if(ct.selected_phases.includes('ph4')) tabs.push({k:'ph4', l:'Phase 4: Delivery'});
+  if(ct.selected_phases.includes('ph5')) tabs.push({k:'ph5', l:'Phase 5: Billing'});
+
+  if(!S.ct_tab || !tabs.find(t => t.k === S.ct_tab)) S.ct_tab = tabs[0].k;
+
+  return `
+    <button class="back-btn" onclick="S.childTaskId = null; S.childTask = null; render();">← Back to Parent Task</button>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:12px; color:var(--text2); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Child Task</div>
+        <h1 style="font-size:19px;font-weight:800;margin-bottom:6px">${esc(ct.title)}</h1>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          ${stageBadge(ct.stage)}
+          ${showValue && ct.total_value ? `<span style="font-weight:600; color:var(--primary); padding: 4px 8px; background:var(--surface); border-radius:4px; font-size:13px;">${fmt(ct.total_value, 'currency')}</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${ChildTaskActionBtns(ct, role)}</div>
+    </div>
+    
+    <div class="pipeline">
+      ${ChildTaskPipeline(ct)}
+    </div>
+
+    <div class="tabs">
+      ${tabs.map(tb => `<button class="tab-btn ${S.ct_tab === tb.k ? 'active' : ''}" onclick="S.ct_tab='${tb.k}'; render();">${tb.l}</button>`).join('')}
+    </div>
+    <div id="ct-tab-body" style="padding-top:16px">
+      ${ChildTaskTab(ct, S.ct_tab, role)}
+    </div>
+  `;
+}
+
+function ChildTaskPipeline(ct) {
+  let html = '<div class="pip-track">';
+  const selected = ['ph1', ...ct.selected_phases];
+  
+  const stepMap = {
+    'ph1': { stages: ['ph1'], l: 'Created' },
+    'ph2': { stages: ['ph2_active', 'ph2_complete'], l: 'Technical' },
+    'ph3': { stages: ['ph3_active', 'ph3_awarded', 'ph3_disqualified'], l: 'Award' },
+    'ph4': { stages: ['ph4_active', 'ph4_complete'], l: 'Delivery' },
+    'ph5': { stages: ['ph5_active', 'closed'], l: 'Billing' }
+  };
+
+  const steps = selected.map(p => stepMap[p]).filter(Boolean);
+  const currentStage = ct.stage;
+  const ALL = STAGES;
+  const ci = ALL.indexOf(currentStage);
+
+  steps.forEach((step, si) => {
+    const active = step.stages.includes(currentStage);
+    let done = ci > ALL.indexOf(step.stages[step.stages.length-1]);
+    if(currentStage === 'ph3_disqualified' && si > steps.findIndex(s=>s.stages.includes('ph3_active'))) done = false;
+    if(currentStage === 'closed' && step.stages.includes('closed')) done = true;
+    
+    const cls = active ? (currentStage === 'ph3_disqualified' ? 'active-error' : 'active') : done ? 'done' : '';
+    const label = (currentStage === 'ph3_disqualified' && step.stages.includes('ph3_active')) ? 'Disqualified' : step.l;
+    html += `<div class="pip-step"><div class="pip-node">
+      <div class="pip-dot ${cls}">${done?'✓':(currentStage==='ph3_disqualified'&&step.stages.includes('ph3_active'))?'⨯':si+1}</div>
+      <div class="pip-lbl ${cls}">${label}</div>
+    </div></div>`;
+    if (si < steps.length-1) html += `<div class="pip-line ${done?'done':''}"></div>`;
+  });
+  return html + '</div>';
+}
+
+function ChildTaskActionBtns(ct, role) {
+  const btns = [];
+  const isAdmin = role === 'admin';
+  if (isAdmin) btns.push(`<button class="btn btn-ghost btn-sm" onclick="overrideChildTaskStage('${ct.id}')">Override Stage</button>`);
+
+  if (ct.stage === 'ph2_active' && (role === 'tech' || isAdmin)) {
+    btns.push(`<button class="btn btn-primary btn-sm" onclick="ChildTaskNextStage('${ct.id}', 'ph2_complete')">Submit Technical Report</button>`);
+  }
+  if (ct.stage === 'ph3_active' && (role === 'tender' || role === 'lead' || isAdmin)) {
+    btns.push(`<button class="btn btn-primary btn-sm" onclick="ChildTaskNextStage('${ct.id}', 'ph3_awarded')">Declare Award</button>`);
+  }
+  if (ct.stage === 'ph4_active' && (role === 'tech' || isAdmin)) {
+    btns.push(`<button class="btn btn-primary btn-sm" onclick="ChildTaskNextStage('${ct.id}', 'ph4_complete')">Mark Delivered (Ph4)</button>`);
+  }
+  
+  if ((ct.stage === 'ph2_complete' || ct.stage === 'ph3_awarded' || ct.stage === 'ph4_complete') && isAdmin) {
+    const nextPhase = getNextChildTaskPhase(ct.selected_phases, ct.stage);
+    if(nextPhase) {
+      btns.push(`<button class="btn btn-primary btn-sm" onclick="ChildTaskNextStage('${ct.id}', '${nextPhase}')">Move to next Phase</button>`);
+    }
+  }
+
+  return btns.join('');
+}
+
+function getNextChildTaskPhase(selected_phases, currentStage) {
+  const phases = selected_phases;
+  let currentP = currentStage.split('_')[0];
+  const idx = phases.indexOf(currentP);
+  if(idx > -1 && idx < phases.length - 1) {
+    return phases[idx + 1] + '_active';
+  }
+  if(idx === phases.length - 1) return 'closed';
+  return null;
+}
+
+window.overrideChildTaskStage = function(id) {
+  const stage = prompt('Enter exact stage (e.g. ph2_active, ph5_active, closed):');
+  if(!stage) return;
+  ChildTaskNextStage(id, stage);
+}
+
+window.ChildTaskNextStage = async function(id, stage) {
+  try {
+    const { error } = await sbClient.from('child_tasks').update({ stage }).eq('id', id);
+    if(error) throw error;
+    toast('Stage updated', 'success');
+    await loadChildTask(id);
+    render();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+function ChildTaskTab(ct, tab, role) {
+  const isAdmin = role === 'admin';
+  const edit = isAdmin;
+  
+  if (tab === 'overview') {
+    return `
+      <div class="card">
+        <h3>Overview</h3>
+        <div class="form-grid">
+          ${inputGroup('cto_start', 'Start Date', ct.start_date, 'date', edit)}
+          ${inputGroup('cto_end', 'End Date', ct.end_date, 'date', edit)}
+          ${inputGroup('cto_total', 'Total Value', ct.total_value, 'number', edit)}
+        </div>
+        <div class="form-grid" style="margin-top:20px">
+          ${inputGroup('cto_cname', 'Contact Name', ct.contact_name, 'text', edit)}
+          ${inputGroup('cto_cphone', 'Contact Phone', ct.contact_phone, 'text', edit)}
+          ${inputGroup('cto_cemail', 'Contact Email', ct.contact_email, 'text', edit)}
+          ${inputGroup('cto_org', 'Organization', ct.org_name, 'text', edit)}
+        </div>
+        ${edit ? `<button class="btn btn-primary" style="margin-top:16px" onclick="saveChildTaskOverview('${ct.id}')">Save Changes</button>` : ''}
+      </div>
+      <div class="card" style="margin-top:20px">
+        <h3>Extra Details</h3>
+        <div class="form-grid">
+           ${Object.keys(ct.extra_fields || {}).filter(k => k!=='items' && k!=='custom_columns').map(k => {
+             return inputGroup('cte_'+k, k.replace(/_/g,' '), ct.extra_fields[k], 'text', edit);
+           }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  if (tab === 'ph2') {
+    const reports = ct.technical_reports || [];
+    const r = reports[reports.length - 1] || {};
+    const canSubmit = role === 'tech' || isAdmin;
+    return `
+      <div class="card">
+        <div class="sec-title">Phase 2: Technical Survey</div>
+        ${!r.id ? `
+          <div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">Pending Technical Report</div></div>
+          ${canSubmit && ct.stage === 'ph2_active' ? `<div style="text-align:center;margin-top:12px"><button class="btn btn-primary" onclick="openModal('ct-ph2-report')">Submit Technical Report</button></div>` : ''}
+        ` : `
+        <div class="grid g2">
+          ${inputGroup('ctr_sp','Service Provider',r.service_provider)}
+          ${inputGroup('ctr_sdate','Survey Date',r.survey_date)}
+          ${inputGroup('ctr_scby','Survey Conducted By',r.survey_conducted_by)}
+          ${inputGroup('ctr_prem','Type of Premises',r.type_of_premises)}
+          ${inputGroup('ctr_bstruct','Building Structure',r.building_structure)}
+          ${inputGroup('ctr_popd','Nearest POP Dist (Mtr)',r.nearest_pop_dist)}
+          ${inputGroup('ctr_acc','Accessibility',r.accessibility)}
+          ${inputGroup('ctr_pwr','Power Availability',r.power_availability)}
+          ${inputGroup('ctr_rack','Rack Space',r.rack_space)}
+          ${inputGroup('ctr_env','Environment Conditions',r.environment_conditions)}
+          ${inputGroup('ctr_poptype','POP Type',r.pop_type)}
+          ${inputGroup('ctr_dig','Digging Needed',r.digging_needed)}
+          ${r.digging_needed === 'Yes' ? inputGroup('ctr_digdet','Digging Details',r.digging_details) : ''}
+          ${inputGroup('ctr_fstat','Feasibility Status',r.feasibility_status)}
+          ${inputGroup('ctr_snotes','Survey Notes',r.survey_notes,'textarea')}
+        </div>
+        <div style="margin-top:16px">
+          <div style="font-weight:600;margin-bottom:8px">Uploaded Reports:</div>
+          ${r.feasibility_doc_url ? `<a href="${r.feasibility_doc_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Feasibility Doc</a>` : ''}
+          ${r.site_survey_doc_url ? `<a href="${r.site_survey_doc_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Site Survey Doc</a>` : ''}
+        </div>
+        ${canSubmit && ct.stage === 'ph2_active' ? `<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openModal('ct-ph2-report')">Update Report</button></div>` : ''}
+        `}
+      </div>
+    `;
+  }
+
+  if (tab === 'ph3') {
+    const recs = ct.phase3_records || [];
+    const r = recs[recs.length - 1] || {};
+    const showValue = isAdmin || ct.stage === 'ph3_active' || ct.stage === 'ph3_awarded';
+    const canAward = role === 'tender' || role === 'lead' || isAdmin;
+    return `
+      <div class="card">
+        <div class="sec-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Phase 3: Award / Qualification</span>
+          ${showValue && ct.total_value ? `<span style="font-weight:600;color:var(--primary);font-size:13px">Target Value: ${fmt(ct.total_value,'currency')}</span>` : ''}
+        </div>
+        ${!r.id ? `
+          <div class="empty"><div class="empty-icon">⚖</div><div class="empty-title">Pending Award Decision</div></div>
+          ${canAward && ct.stage === 'ph3_active' ? `<div style="text-align:center;margin-top:12px"><button class="btn btn-primary" onclick="openModal('ct-ph3-award')">Record Award Decision</button></div>` : ''}
+        ` : `
+        <div class="grid g2">
+          ${inputGroup('','Qualification Result',r.qualification_result)}
+          ${inputGroup('','Quoted Bid Value',r.quoted_bid_value)}
+          ${r.award_date ? inputGroup('','Award Date',r.award_date) : ''}
+          ${r.notes ? inputGroup('','Notes',r.notes,'textarea') : ''}
+        </div>
+        ${canAward && ct.stage === 'ph3_active' ? `<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openModal('ct-ph3-award')">Update Decision</button></div>` : ''}
+        `}
+      </div>
+    `;
+  }
+
+  if (tab === 'ph4') {
+    const recs = ct.phase4_records || [];
+    const r = recs[recs.length - 1] || {};
+    const canDeliver = role === 'tech' || isAdmin;
+    return `
+      <div class="card">
+        <div class="sec-title">Phase 4: Technical Delivery</div>
+        ${!r.id ? `
+          <div class="empty"><div class="empty-icon">🚚</div><div class="empty-title">Pending Delivery</div></div>
+          ${canDeliver && ct.stage === 'ph4_active' ? `<div style="text-align:center;margin-top:12px"><button class="btn btn-primary" onclick="openModal('ct-ph4-deliver')">Mark Delivered</button></div>` : ''}
+        ` : `
+        <div class="grid g2">
+          ${inputGroup('','Actual Delivery Date',r.delivery_date)}
+          ${inputGroup('','Delivery Notes',r.delivery_notes,'textarea')}
+        </div>
+        ${r.ipv4_addresses && r.ipv4_addresses.length ? `
+        <div style="margin-top:16px">
+          <div style="font-weight:600;margin-bottom:8px">IPv4 Addresses:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${r.ipv4_addresses.map(ip=>`<span class="badge" style="background:var(--blue);color:#fff">${esc(ip)}</span>`).join('')}</div>
+        </div>` : ''}
+        ${r.ipv6_addresses && r.ipv6_addresses.length ? `
+        <div style="margin-top:16px">
+          <div style="font-weight:600;margin-bottom:8px">IPv6 Addresses:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${r.ipv6_addresses.map(ip=>`<span class="badge" style="background:var(--blue);color:#fff">${esc(ip)}</span>`).join('')}</div>
+        </div>` : ''}
+        ${r.router_names && r.router_names.length ? `
+        <div style="margin-top:16px">
+          <div style="font-weight:600;margin-bottom:8px">Routers/Accessories:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${r.router_names.map(rn=>`<span class="badge b-gray">${esc(rn)}</span>`).join('')}</div>
+        </div>` : ''}
+        <div style="margin-top:16px">
+          <div style="font-weight:600;margin-bottom:8px">Documents:</div>
+          ${r.acceptance_form_url ? `<a href="${r.acceptance_form_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Acceptance Form</a>` : ''}
+          ${r.completion_cert_url ? `<a href="${r.completion_cert_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Completion Certificate</a>` : ''}
+        </div>
+        ${canDeliver && ct.stage === 'ph4_active' ? `<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openModal('ct-ph4-deliver')">Update Delivery</button></div>` : ''}
+        `}
+      </div>
+    `;
+  }
+
+  if (tab === 'ph5') {
+    const act = role === 'acct' || isAdmin;
+    const invs = ct.invoices || [];
+    const inv = invs[invs.length - 1] || {};
+    const cycs = ct.payment_cycles || [];
+    const showValue = isAdmin || role === 'acct';
+
+    let totalDue = cycs.reduce((a,c) => a + parseFloat(c.amount_due||0), 0);
+    let totalRec = cycs.reduce((a,c) => a + parseFloat(c.amount_received||0), 0);
+    let bal = totalDue - totalRec;
+
+    const headHtml = !inv.id
+      ? (act && ct.stage === 'ph5_active'
+          ? `<button class="btn btn-primary" onclick="openModal('ct-ph5-invoice')">Create Invoice Header</button>`
+          : `<div class="empty"><div class="empty-icon">₹</div><div class="empty-title">Pending Invoice Creation</div></div>`)
+      : `
+        ${showValue && ct.total_value ? `<div style="margin-bottom:12px;padding:8px 12px;background:var(--bg2);border-radius:6px;font-weight:600;color:var(--primary)">Contract Reference Value: ${fmt(ct.total_value,'currency')}</div>` : ''}
+        <div class="grid g3">
+          ${inputGroup('','Award Date',inv.award_date)}
+          ${inputGroup('','Invoice Number',inv.invoice_number)}
+          ${inputGroup('','Total Contract Price',inv.total_price)}
+          ${inputGroup('','Billing Price',inv.billing_price)}
+          ${inputGroup('','Base Price',inv.base_price)}
+          ${inputGroup('','GST %',inv.gst_pct)}
+          ${inputGroup('','Invoice Value (Auto)',inv.invoice_value)}
+          ${inputGroup('','Duration From',inv.duration_from)}
+          ${inputGroup('','Duration To',inv.duration_to)}
+          ${inputGroup('','Payment Cycle',inv.payment_cycle)}
+        </div>
+        ${inv.invoice_upload_url ? `<div style="margin-top:12px"><a href="${inv.invoice_upload_url}" target="_blank" class="btn btn-ghost btn-sm">📄 View Invoice Document</a></div>` : ''}
+      `;
+
+    const cycHtml = !inv.id ? '' : `
+      <div class="sec-title" style="margin-top:32px;display:flex;justify-content:space-between">
+        <span>Payment Cycles</span>
+        ${act && ct.stage === 'ph5_active' ? `<button class="btn btn-primary btn-sm" onclick="openModal('ct-ph5-cycle')">+ Add Cycle</button>` : ''}
+      </div>
+      <div style="background:var(--bg2);padding:12px;border-radius:6px;display:flex;gap:24px;margin-bottom:16px;font-weight:600;flex-wrap:wrap">
+        <div>Total Due: <span style="color:var(--text1)">₹${totalDue.toLocaleString('en-IN')}</span></div>
+        <div>Total Received: <span style="color:var(--green)">₹${totalRec.toLocaleString('en-IN')}</span></div>
+        <div>Balance: <span style="color:var(--red)">₹${bal.toLocaleString('en-IN')}</span></div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Cycle</th><th>Invoice</th><th>Period</th><th>Due</th><th>Status</th><th>Received</th><th>Pay Date</th>${act?'<th>Act</th>':''}</tr></thead>
+        <tbody>${cycs.map(c=>`
+          <tr>
+            <td>#${c.cycle_number}</td>
+            <td>${c.invoice_number||'-'}${c.invoice_doc_url ? ` <a href="${c.invoice_doc_url}" target="_blank" title="View Invoice">📄</a>` : ''}</td>
+            <td>${fmt(c.period_from,'date')} – ${fmt(c.period_to,'date')}</td>
+            <td>${fmt(c.amount_due,'currency')}</td>
+            <td><span class="badge ${c.payment_status==='Paid'?'b-green':c.payment_status==='Partial'?'b-amber':'b-gray'}">${c.payment_status}</span></td>
+            <td>${fmt(c.amount_received,'currency')}</td>
+            <td>${fmt(c.payment_date,'date')}</td>
+            ${act?`<td><button class="btn btn-ghost btn-sm" onclick="editCtCycle('${c.id}')">Edit</button></td>`:''}
+          </tr>
+        `).join('')}
+        ${!cycs.length?`<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text3)">No payment cycles yet</td></tr>`:''}
+        </tbody>
+      </table></div>
+    `;
+
+    return `<div class="card"><div class="sec-title">Phase 5: Invoice Header</div>${headHtml}${cycHtml}</div>`;
+  }
+}
+
+window.saveChildTaskOverview = async function(id) {
+  try {
+    const update = {
+      start_date: $('cto_start').value,
+      end_date: $('cto_end').value,
+      total_value: $('cto_total').value || null,
+      contact_name: $('cto_cname').value,
+      contact_phone: $('cto_cphone').value,
+      contact_email: $('cto_cemail').value,
+      org_name: $('cto_org').value,
+    };
+    const { error } = await sbClient.from('child_tasks').update(update).eq('id', id);
+    if(error) throw error;
+    toast('Task updated', 'success');
+    await loadChildTask(id);
+    render();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+// ==========================================
 
 // ---- Run ----
 init();
