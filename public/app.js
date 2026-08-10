@@ -4150,7 +4150,7 @@ window.openCreateChildTask = function(parentId, parentType, parentCategory) {
     <div class="form-grid">
       ${inputGroup('ct_title','Title (Required)','','text',true)}
       ${inputGroup('ct_start','Start Date (Required)','','date',true)}
-      ${inputGroup('ct_end','End Date (Required)','','date',true)}
+      ${inputGroup('ct_end','End Date (Optional)','','date',true)}
       ${inputGroup('ct_total','Total Value (Optional)','','number',true)}
       <div style="grid-column: 1 / -1; margin-top:12px; font-weight:600;">Selected Phases</div>
       <div style="grid-column: 1 / -1; display:flex; gap:16px;">
@@ -4171,7 +4171,7 @@ window.openCreateChildTask = function(parentId, parentType, parentCategory) {
         <textarea id="ct_addr" class="form-control">${esc(p.link_delivery_address || '')}</textarea>
       </div>
     </div>
-    <div style="margin-top:20px; font-weight:600;">Extra Fields (Type: ${parentCategory})</div>
+    <div style="margin-top:20px; font-weight:600;">${parentCategory === 'order' ? 'Additions' : 'Extra Fields'} (Type: ${parentCategory})</div>
     <div class="form-grid" id="ct_extra_fields">
       ${renderExtraFieldsByCategoryForm(parentCategory, {})}
     </div>
@@ -4210,6 +4210,12 @@ function renderExtraFieldsByCategoryForm(category, extra) {
      return `
        ${inputGroup('ex_order_number','Order Number',extra.order_number||'','text',true)}
        ${inputGroup('ex_cust_name','Customer Name',extra.customer_name||'','text',true)}
+       ${inputGroup('ex_add_bw','Additional Bandwidth',extra.additional_bandwidth||'','text',true)}
+       <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="ex_site_survey" ${extra.site_survey === 'Yes' ? 'checked' : ''}>
+          <label for="ex_site_survey" style="margin:0">Site Survey Required</label>
+       </div>
+       ${inputGroup('ex_extra_details','Details of what extra is needed',extra.details_of_what_extra_is_needed||'','textarea',true)}
        <div style="grid-column: 1 / -1; color: var(--text2); font-size:12px;">(Items and Custom Columns can be added inside the task)</div>
      `;
   }
@@ -4240,6 +4246,9 @@ function extractExtraFields(category) {
   if (category === 'order' || category === 'project') {
     extra.order_number = $('ex_order_number')?.value;
     extra.customer_name = $('ex_cust_name')?.value;
+    extra.additional_bandwidth = $('ex_add_bw')?.value;
+    extra.site_survey = $('ex_site_survey')?.checked ? 'Yes' : 'No';
+    extra.details_of_what_extra_is_needed = $('ex_extra_details')?.value;
     extra.items = [];
     extra.custom_columns = [];
   }
@@ -4250,7 +4259,7 @@ window.createChildTask = async function(parentId, parentType, parentCategory) {
   const title = $('ct_title').value.trim();
   const start_date = $('ct_start').value;
   const end_date = $('ct_end').value;
-  if(!title || !start_date || !end_date) return toast('Title, Start Date, and End Date are required', 'error');
+  if(!title || !start_date) return toast('Title and Start Date are required', 'error');
 
   const phases = ['ph5'];
   if($('ct_ph2')?.checked) phases.push('ph2');
@@ -4271,7 +4280,7 @@ window.createChildTask = async function(parentId, parentType, parentCategory) {
     workspace_id: S.workspaceId,
     title,
     start_date,
-    end_date,
+    end_date: end_date || null,
     total_value: $('ct_total').value || null,
     contact_name: $('ct_cname').value,
     contact_phone: $('ct_cphone').value,
@@ -4523,7 +4532,7 @@ function ChildTaskTab(ct, tab, role) {
         ${edit ? `<button class="btn btn-primary" style="margin-top:16px" onclick="saveChildTaskOverview('${ct.id}')">Save Changes</button>` : ''}
       </div>
       <div class="card" style="margin-top:20px">
-        <h3>Extra Details</h3>
+        <h3>${ct.parent_category === 'order' ? 'Additions' : 'Extra Details'}</h3>
         <div class="form-grid">
            ${Object.keys(ct.extra_fields || {}).filter(k => k!=='items' && k!=='custom_columns').map(k => {
              return inputGroup('cte_'+k, k.replace(/_/g,' '), ct.extra_fields[k], 'text', edit);
