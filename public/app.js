@@ -2229,6 +2229,8 @@ function TabTechnical(t, role) {
             ${inputGroup('r_poptype','POP Type',r.pop_type)}
             ${inputGroup('r_dig','Digging Needed',r.digging_needed)}
             ${r.digging_needed==='Yes' ? inputGroup('r_digdet','Digging Details',r.digging_details,'textarea') : ''}
+            ${inputGroup('r_fstat','Feasibility Status',r.feasibility_status)}
+            ${inputGroup('r_snotes','Survey Notes',r.survey_notes,'textarea')}
         </div>
         <div style="margin-top:16px">
             <div style="font-weight:600;margin-bottom:8px">Uploaded Reports:</div>
