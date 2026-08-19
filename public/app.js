@@ -4177,7 +4177,7 @@ window.openCreateChildTask = function(parentId, parentType, parentCategory) {
     </div>
     <div style="margin-top:20px; font-weight:600;">${parentCategory === 'order' ? 'Additions' : 'Extra Fields'} (Type: ${parentCategory})</div>
     <div class="form-grid" id="ct_extra_fields">
-      ${renderExtraFieldsByCategoryForm(parentCategory, {})}
+      ${renderExtraFieldsByCategoryForm(parentCategory, p)}
     </div>
   `;
   showModal(MW('Create Child Task', body, `
@@ -4190,14 +4190,26 @@ function renderExtraFieldsByCategoryForm(category, extra) {
   if (category === 'tender') {
      return `
        ${inputGroup('ex_bid_number','Bid Number',extra.bid_number||'','text',true)}
+       ${inputGroup('ex_bid_init_date','Bid Initiation Date',extra.bid_init_date||'','date',true)}
        ${inputGroup('ex_pre_bid','Pre-bid Datetime',extra.pre_bid_datetime||'','datetime-local',true)}
        ${inputGroup('ex_bid_end','Bid End Datetime',extra.bid_end_datetime||'','datetime-local',true)}
+       ${inputGroup('ex_bid_opening','Bid Opening Datetime',extra.bid_opening_datetime||'','datetime-local',true)}
        ${inputGroup('ex_ministry','Ministry/State',extra.ministry_state||'','text',true)}
        ${inputGroup('ex_dept','Department',extra.dept_name||'','text',true)}
+       ${inputGroup('ex_pre_bid_loc','Pre-Bid Location',extra.pre_bid_location||'','text',true)}
+       ${inputGroup('ex_pre_bid_contact','Pre-Bid Contact',extra.pre_bid_contact||'','text',true)}
        ${inputGroup('ex_grievance','Grievance Contact',extra.grievance_contact||'','text',true)}
        ${inputGroup('ex_pay_terms','Payment Terms',extra.payment_terms||'','text',true)}
        ${inputGroup('ex_contract','Contract Period',extra.contract_period||'','text',true)}
        ${inputGroup('ex_est_val','Est Bid Value',extra.est_bid_value||'','number',true)}
+       ${inputGroup('ex_ddos','DDOS with ILL',extra.ddos_with_ill||'','select',true,['','Yes','No','Optional'])}
+       ${inputGroup('ex_media','Type of Media',extra.media_type||'','multiselect',true,['Fiber','Radio','Copper'])}
+       ${inputGroup('ex_static_ip','Static IP Required',extra.static_ip_required||'','select',true,['','Yes','No'])}
+       ${inputGroup('ex_ipv4','Number of IPv4 Pools',extra.num_ipv4||'','number',true)}
+       ${inputGroup('ex_ipv6','Number of IPv6 Pools',extra.num_ipv6||'','number',true)}
+       ${inputGroup('ex_router','Router/Accessories',extra.router_accessories||'','select',true,['','Yes','No'])}
+       ${inputGroup('ex_router_cnt','Number of Routers',extra.router_count||'','number',true)}
+       ${inputGroup('ex_gst_num','GST Number',extra.gst_number||'','text',true)}
      `;
   }
   if (category === 'lead') {
@@ -4208,6 +4220,8 @@ function renderExtraFieldsByCategoryForm(category, extra) {
        ${inputGroup('ex_dept','Department',extra.dept_name||'','text',true)}
        ${inputGroup('ex_pay_terms','Payment Terms',extra.payment_terms||'','text',true)}
        ${inputGroup('ex_contract','Contract Period',extra.contract_period||'','text',true)}
+       ${inputGroup('ex_lead_source','Lead Source',extra.lead_source||'','text',true)}
+       ${inputGroup('ex_est_val','Est Value',extra.est_bid_value||'','number',true)}
      `;
   }
   if (category === 'order' || category === 'project') {
@@ -4230,14 +4244,26 @@ function extractExtraFields(category) {
   const extra = {};
   if (category === 'tender') {
     extra.bid_number = $('ex_bid_number')?.value;
+    extra.bid_init_date = $('ex_bid_init_date')?.value;
     extra.pre_bid_datetime = $('ex_pre_bid')?.value;
     extra.bid_end_datetime = $('ex_bid_end')?.value;
+    extra.bid_opening_datetime = $('ex_bid_opening')?.value;
     extra.ministry_state = $('ex_ministry')?.value;
     extra.dept_name = $('ex_dept')?.value;
+    extra.pre_bid_location = $('ex_pre_bid_loc')?.value;
+    extra.pre_bid_contact = $('ex_pre_bid_contact')?.value;
     extra.grievance_contact = $('ex_grievance')?.value;
     extra.payment_terms = $('ex_pay_terms')?.value;
     extra.contract_period = $('ex_contract')?.value;
     extra.est_bid_value = $('ex_est_val')?.value;
+    extra.ddos_with_ill = $('ex_ddos')?.value;
+    extra.media_type = Array.from($('ex_media')?.selectedOptions || []).map(o=>o.value).join(',');
+    extra.static_ip_required = $('ex_static_ip')?.value;
+    extra.num_ipv4 = $('ex_ipv4')?.value;
+    extra.num_ipv6 = $('ex_ipv6')?.value;
+    extra.router_accessories = $('ex_router')?.value;
+    extra.router_count = $('ex_router_cnt')?.value;
+    extra.gst_number = $('ex_gst_num')?.value;
   }
   if (category === 'lead') {
     extra.order_number = $('ex_order_number')?.value;
@@ -4246,6 +4272,8 @@ function extractExtraFields(category) {
     extra.dept_name = $('ex_dept')?.value;
     extra.payment_terms = $('ex_pay_terms')?.value;
     extra.contract_period = $('ex_contract')?.value;
+    extra.lead_source = $('ex_lead_source')?.value;
+    extra.est_bid_value = $('ex_est_val')?.value;
   }
   if (category === 'order' || category === 'project') {
     extra.order_number = $('ex_order_number')?.value;
@@ -4484,6 +4512,44 @@ function ChildTaskActionBtns(ct, role) {
 
   return btns.join('');
 }
+window.uploadChildTaskDocs = async function(files, id) {
+  if(!files.length) return;
+  try {
+    for (const file of files) {
+      const fileData = await uploadFile(file);
+      await sbClient.from('child_task_documents').insert({
+        child_task_id: id,
+        workspace_id: S.workspaceId,
+        name: fileData.name,
+        stored: fileData.stored,
+        url: fileData.url,
+        size: fileData.size,
+        mime: fileData.mime,
+        uploaded_by: S.user.id
+      });
+    }
+    toast('Documents uploaded successfully', 'success');
+    await loadChildTask(id);
+    render();
+  } catch(e) {
+    console.error(e);
+    toast(e.message, 'error');
+  }
+}
+
+window.deleteChildTaskDoc = async function(docId, stored) {
+  if(!confirm('Delete this document?')) return;
+  try {
+    if(stored) await sbClient.storage.from('documents').remove([stored]);
+    const { error } = await sbClient.from('child_task_documents').delete().eq('id', docId);
+    if(error) throw error;
+    toast('Document deleted', 'success');
+    await loadChildTask(S.childTaskId);
+    render();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
 
 function getNextChildTaskPhase(selected_phases, currentStage) {
   const phases = selected_phases;
@@ -4542,6 +4608,25 @@ function ChildTaskTab(ct, tab, role) {
              return inputGroup('cte_'+k, k.replace(/_/g,' '), ct.extra_fields[k], 'text', edit);
            }).join('')}
         </div>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3>Documents</h3>
+          <div style="display:flex;gap:8px;">
+             <input type="file" id="ctDocsInput" multiple style="display:none" onchange="uploadChildTaskDocs(this.files, '${ct.id}')">
+             ${edit ? `<button class="btn btn-outline btn-sm" onclick="document.getElementById('ctDocsInput').click()">+ Upload Files</button>` : ''}
+          </div>
+        </div>
+        ${(ct.documents || []).length ? '<div style="display:flex;flex-direction:column;gap:8px;">' + (ct.documents || []).map(d => `
+          <div class="file-item">
+            <div class="file-icon">${fileIcon(d.mime)}</div>
+            <div class="file-details">
+              <div class="file-name"><a href="${d.url}" target="_blank">${esc(d.name)}</a></div>
+              <div class="file-meta">${fmt(d.size,'size')} • ${fmt(d.created_at,'date')}</div>
+            </div>
+            ${edit ? `<button class="btn btn-ghost text-red" onclick="deleteChildTaskDoc('${d.id}', '${d.stored}')">Delete</button>` : ''}
+          </div>
+        `).join('') + '</div>' : '<div class="empty" style="padding:16px"><div class="empty-icon">📁</div><div class="empty-title">No documents uploaded</div></div>'}
       </div>
     `;
   }
@@ -4729,6 +4814,20 @@ window.saveChildTaskOverview = async function(id) {
       contact_email: $('cto_cemail').value,
       org_name: $('cto_org').value,
     };
+    if (S.childTask?.extra_fields) {
+      update.extra_fields = { ...S.childTask.extra_fields };
+      Object.keys(S.childTask.extra_fields).forEach(k => {
+        if (k === 'items' || k === 'custom_columns') return;
+        const el = $('cte_' + k);
+        if (el) {
+           if (el.multiple) {
+              update.extra_fields[k] = Array.from(el.selectedOptions).map(o=>o.value).join(',');
+           } else {
+              update.extra_fields[k] = el.value;
+           }
+        }
+      });
+    }
     const { error } = await sbClient.from('child_tasks').update(update).eq('id', id);
     if(error) throw error;
     toast('Task updated', 'success');
