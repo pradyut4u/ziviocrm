@@ -459,6 +459,9 @@ async function up(path, fd) {
       power_availability: fd.get('power_availability'),
       rack_space: fd.get('rack_space'),
       environment_conditions: fd.get('environment_conditions'),
+      pop_type: fd.get('pop_type'),
+      digging_needed: fd.get('digging_needed'),
+      digging_details: fd.get('digging_details'),
       feasibility_doc_url: fDoc?.url || null,
       site_survey_doc_url: sDoc?.url || null
     });
