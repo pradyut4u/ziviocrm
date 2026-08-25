@@ -44,9 +44,16 @@ function checkAlert(item) {
   
   // Tender/Lead/Sales and Admins care about pre-bid and bid dates
   if (['tender', 'lead', 'admin', 'mgmt'].includes(role)) {
-    if (item.pre_bid_datetime) dates.push(new Date(item.pre_bid_datetime));
-    if (item.bid_init_date) dates.push(new Date(item.bid_init_date));
-    if (item.bid_end_datetime) dates.push(new Date(item.bid_end_datetime));
+    const p3recs = item.phase3_records || [];
+    const lastP3 = p3recs.length > 0 ? p3recs[p3recs.length - 1] : null;
+
+    if (lastP3 && lastP3.extended_date) {
+      dates.push(new Date(lastP3.extended_date));
+    } else {
+      if (item.pre_bid_datetime) dates.push(new Date(item.pre_bid_datetime));
+      if (item.bid_init_date) dates.push(new Date(item.bid_init_date));
+      if (item.bid_end_datetime) dates.push(new Date(item.bid_end_datetime));
+    }
   }
   
   // Tech/Delivery and Admins care about delivery dates (Phase 4)
@@ -1988,7 +1995,7 @@ function TabProcurement(t, role) {
 function TabProject(t, tab, role) { 
   let edit = ['admin', 'mgmt', 'tech', 'tender', 'lead'].includes(role);
   if (role === 'tech' && (tab === 'project_details' || tab === 'project_technical')) edit = false;
-  if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph2_active') && (tab === 'project_details' || tab === 'project_technical')) edit = false;
+  if (STAGES.indexOf(t.stage) >= STAGES.indexOf('ph4_active') && (tab === 'project_details' || tab === 'project_technical')) edit = false;
   if (tab === 'project_details') {
   const d = t.data || {};
   const items = d.items || [];
@@ -2126,7 +2133,7 @@ function inputGroup(id, label, value, type='text', edit=false, options=[]) {
 
 // -- Phase 1 --
 function TabTenderInfo(t, role) {
-    const edit = (role === 'tender' || role === 'admin') && t.stage === 'ph1_draft';
+    const edit = (role === 'tender' || role === 'admin') && STAGES.indexOf(t.stage) < STAGES.indexOf('ph4_active');
     return `
       <div class="card">
         <div class="sec-title">Phase 1: Tender Details</div>
@@ -2168,7 +2175,7 @@ function TabTenderInfo(t, role) {
           ${inputGroup('grievance_contact','Grievance Redressal Contact',t.grievance_contact,'textarea',edit)}
           ${inputGroup('link_delivery_address','Link Delivery Address',t.link_delivery_address,'textarea',edit)}
         </div>
-        ${edit ? `<button type="submit" class="btn btn-primary" style="margin-top:16px">Save Phase 1 Draft</button>` : ''}
+        ${edit ? `<button type="submit" class="btn btn-primary" style="margin-top:16px">Save Phase 1 Details</button>` : ''}
         </form>
         
         <div class="sec-title" style="margin-top:24px">Tender Documents</div>
@@ -2558,7 +2565,7 @@ function TabInventory(t, tab, role) {
 }
 
 function TabLeadInfo(t, role) {
-    const edit = (role === 'lead' || role === 'admin') && t.stage === 'ph1_draft';
+    const edit = (role === 'lead' || role === 'admin') && STAGES.indexOf(t.stage) < STAGES.indexOf('ph4_active');
     return `
       <div class="card">
         <div class="sec-title">Phase 1: Lead Details</div>
@@ -2591,7 +2598,7 @@ function TabLeadInfo(t, role) {
           ${inputGroup('grievance_contact','Grievance Redressal Contact',t.grievance_contact,'textarea',edit)}
           ${inputGroup('link_delivery_address','Link Delivery Address',t.link_delivery_address,'textarea',edit)}
         </div>
-        ${edit ? `<button type="submit" class="btn btn-primary" style="margin-top:16px">Save Phase 1 Draft</button>` : ''}
+        ${edit ? `<button type="submit" class="btn btn-primary" style="margin-top:16px">Save Phase 1 Details</button>` : ''}
         </form>
         
         <div class="sec-title" style="margin-top:24px">Lead Documents</div>
@@ -3786,7 +3793,7 @@ function attachAll() {
 
   // Phase 1: Submit to Technical button (lives on main page)
   $('btnSubmitPh1Tender')?.addEventListener('click', async () => {
-    if (confirm('Submit tender to Technical team? This will lock Phase 1 for editing.')) {
+    if (confirm('Submit tender to Technical team?')) {
       try { await api('POST', `/tenders/${S.tenderId}/move`, { stage: 'ph2_active' }); await loadAll(); await loadTender(S.tenderId); render(); toast('Moved to Phase 2 — Technical', 'success'); } catch (e) { toast(e.message, 'error'); }
     }
   });
