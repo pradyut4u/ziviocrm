@@ -1045,7 +1045,7 @@ function PageDashboard() {
 
   html += `
     <div class="dash-filters" style="display:flex; gap:12px; margin-bottom: 20px;">
-      <input type="text" id="dashSearch" class="form-input" placeholder="Search by Customer, Address, Circuit..." style="flex:1" autocomplete="off" />
+      <input type="text" id="dashSearch" class="form-input" placeholder="Search by Order #, Customer, Address, Circuit..." style="flex:1" autocomplete="off" />
       <select id="dashFilterStage" class="form-input" style="width:200px">
         <option value="">All Stages</option>
         ${STAGES.map(s => `<option value="${s}">${s.replace(/_/g, ' ').toUpperCase()}</option>`).join('')}
@@ -1087,7 +1087,8 @@ function PageDashboard() {
               <tbody>
                 ${leads.map((acc, i) => {
                   const alert = checkAlert(acc);
-                  const searchStr = `${esc(acc.org_name || '')} ${esc(acc.link_delivery_address || '')} ${esc(acc.service_type || '')} ${(acc.circuits||[]).map(c=>c.circuit_id).join(' ')}`;
+                  const orderNum = acc.requirements?.order_number || acc.order_number || '';
+                  const searchStr = `${esc(orderNum)} ${esc(acc.org_name || '')} ${esc(acc.link_delivery_address || '')} ${esc(acc.service_type || '')} ${(acc.circuits||[]).map(c=>c.circuit_id).join(' ')}`;
                   return `
                   <tr class="tr-link dash-row ${alert ? 'alert-blinking' : ''}" data-lnav="${acc.id}" data-stage="${acc.stage}" data-search="${searchStr}">
                     <td>${i + 1}</td>
@@ -1144,7 +1145,8 @@ function PageDashboard() {
               <tbody>
                 ${tenders.map((acc, i) => {
                   const alert = checkAlert(acc);
-                  const searchStr = `${esc(acc.org_name || '')} ${esc(acc.link_delivery_address || '')} ${esc(acc.service_type || '')} ${(acc.circuits||[]).map(c=>c.circuit_id).join(' ')}`;
+                  const orderNum = acc.requirements?.order_number || acc.order_number || '';
+                  const searchStr = `${esc(orderNum)} ${esc(acc.org_name || '')} ${esc(acc.link_delivery_address || '')} ${esc(acc.service_type || '')} ${(acc.circuits||[]).map(c=>c.circuit_id).join(' ')}`;
                   return `
                   <tr class="tr-link dash-row ${alert ? 'alert-blinking' : ''}" data-tnav="${acc.id}" data-stage="${acc.stage}" data-search="${searchStr}">
                     <td>${i + 1}</td>
