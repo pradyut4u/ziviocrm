@@ -639,14 +639,6 @@ async function handle(req, res) {
     const cyc = upd('payment_cycles', pcm[1], b);
     if (!cyc) return jerr(res, 'Not found', 404);
     await saveDb();
-    
-    // Auto-close logic
-    const cycles = tbl('payment_cycles').filter(c => c.tender_id === tid);
-    if (cycles.length > 0 && cycles.every(c => c.payment_status === 'Paid')) {
-        upd('tenders', tid, { stage: 'closed' });
-        await saveDb();
-    }
-    
     audit('payment_cycle.update', 'payment_cycle', pcm[1], user.id, b);
     return jres(res, cyc);
   }
@@ -970,14 +962,6 @@ async function handle(req, res) {
     const cyc = upd('lead_payment_cycles', pcm[1], b);
     if (!cyc) return jerr(res, 'Not found', 404);
     await saveDb();
-    
-    // Auto-close logic
-    const cycles = tbl('lead_payment_cycles').filter(c => c.lead_id === lid);
-    if (cycles.length > 0 && cycles.every(c => c.payment_status === 'Paid')) {
-        upd('leads', lid, { stage: 'closed' });
-        await saveDb();
-    }
-    
     audit('payment_cycle.update', 'payment_cycle', pcm[1], user.id, b);
     return jres(res, cyc);
   }

@@ -529,12 +529,12 @@ async function up(path, fd) {
     
     const payload = {};
     if (fd.has('cycle_number')) payload.cycle_number = parseInt(fd.get('cycle_number'));
-    if (fd.has('period_from')) payload.period_from = fd.get('period_from');
-    if (fd.has('period_to')) payload.period_to = fd.get('period_to');
+    if (fd.has('period_from')) payload.period_from = fd.get('period_from') || null;
+    if (fd.has('period_to')) payload.period_to = fd.get('period_to') || null;
     if (fd.has('amount_due')) payload.amount_due = parseFloat(fd.get('amount_due') || 0);
     if (fd.has('payment_status')) payload.payment_status = fd.get('payment_status');
     if (fd.has('amount_received')) payload.amount_received = parseFloat(fd.get('amount_received') || 0);
-    if (fd.has('payment_date')) payload.payment_date = fd.get('payment_date');
+    if (fd.has('payment_date')) payload.payment_date = fd.get('payment_date') || null;
     if (fd.has('invoice_number')) payload.invoice_number = fd.get('invoice_number');
     
     if (fd.has('invoice_doc')) {
@@ -549,12 +549,6 @@ async function up(path, fd) {
        payload.created_by = S.user.id;
        payload.workspace_id = S.workspaceId;
        await sbClient.from(prefix + 'payment_cycles').insert(payload);
-    }
-    
-    // Auto-close check
-    const { data: cycles } = await sbClient.from(prefix + 'payment_cycles').select('payment_status').eq(pId, id);
-    if (cycles && cycles.length > 0 && cycles.every(cy => cy.payment_status === 'Paid')) {
-        await sbClient.from(table).update({ stage: 'closed' }).eq('id', id);
     }
     
     return { success: true };
@@ -3145,15 +3139,6 @@ function attachModalHandlers() {
        }
        
        await loadChildTask(S.childTaskId);
-       
-       if (S.childTask && S.childTask.payment_cycles && S.childTask.payment_cycles.length > 0) {
-         const allPaid = S.childTask.payment_cycles.every(c => c.payment_status === 'Paid');
-         if(allPaid && S.childTask.stage !== 'closed') {
-           await sbClient.from('child_tasks').update({stage: 'closed'}).eq('id', S.childTaskId);
-           await loadChildTask(S.childTaskId);
-         }
-       }
-
        removeModal(); render(); toast('Payment Cycle Saved', 'success');
      } catch(e){ toast(e.message, 'error'); }
   });
